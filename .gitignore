@@ -1,0 +1,10 @@
+# Netlify CLI state
+.netlify/
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+# Raw NASA downloads used by tools/build_data.py (large; get them again from the links in docs/DATA_SOURCES.md)
+raw/
