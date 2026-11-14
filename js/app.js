@@ -113,6 +113,8 @@
       document.querySelector('.tabs').addEventListener('click', onTab);
       $('topnav').addEventListener('click', onTab);
       $('btn-about').addEventListener('click', about);
+      $('nav-about').addEventListener('click', about);
+      $('nav-home').addEventListener('click', () => MM.intro.open());
       $('modal-x').addEventListener('click', closeModal);
       $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });
       document.addEventListener('keydown', (e) => {
