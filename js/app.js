@@ -81,6 +81,9 @@
           <li><b>Radio cover.</b> Line of sight from each step to a 10 m mast at base over the elevation model, including the curvature of Mars.</li>
           <li><b>Mars time and Sun.</b> Allison &amp; McEwen (2000), the algorithm behind NASA's Mars24. It reproduces the sol numbers and sunrise times in the mission weather feeds.</li>
           <li><b>Dust risk.</b> Seasonal storm windows by solar longitude (Kass et al. 2016).</li>
+          <li><b>Oxygen.</b> Metabolic use per astronaut is checked against the usable oxygen in each suit (0.6 kg by default, close to the primary tank of NASA's ISS spacesuit; editable), keeping 25% in reserve. A crew of one is flagged: EVAs are walked in pairs.</li>
+          <li><b>No-go zones and field reports.</b> Areas the crew draws are burned into a mask over the 20 m grid, and the route search treats those cells as impassable. A hazard report can keep routes 50 to 200 m away. Each report carries a confidence label: Measured, Observed or Estimated.</li>
+          <li><b>Route options.</b> "Safest" weights slope strongly (hazard factor 1 + 2.5 (s / limit)²); "Fastest" nearly ignores slope below the limit; "Science-rich" adds up to three targets near the route while the suit reserve still holds.</li>
         </ul>
         <h3>Limits you should know</h3>
         <ul>
@@ -88,7 +91,7 @@
           <li>Weather is a seasonal outlook, not a forecast. The public MEDA feed is not updated every sol.</li>
           <li>Speed and energy models come from Apollo lunar data and are planning estimates.</li>
         </ul>
-        <p class="note">Built for the NASA Space Apps Challenge. NASA does not endorse this project. Map library: Leaflet (BSD-2).</p>
+        <p class="note">Built for the NASA Space Apps Challenge. NASA does not endorse this project. Map library: Leaflet (BSD-2). 3D: three.js (MIT). Source code: <a href="https://github.com/lordfire4455/marswalk-planner" target="_blank" rel="noopener">github.com/lordfire4455/marswalk-planner</a>.</p>
       </div>`, 'wide');
   }
 
@@ -101,6 +104,7 @@
       MM.layers.init();
       MM.science.init();
       MM.conditions.init();
+      MM.field.init();
       MM.planner.init();
 
       $('presets').innerHTML = PRESETS.map((p) => `<button class="preset" data-preset="${p.id}"><span class="preset-ico">${p.icon}</span><span><b>${p.title}</b><small>${p.sub}</small></span></button>`).join('');
@@ -114,6 +118,7 @@
         if (!$('modal').hidden) closeModal(); else MM.intro.close();
       });
       $('btn-intro').addEventListener('click', () => MM.intro.open());
+      $('btn-tour').addEventListener('click', () => MM.tour.start());
       $('brand').addEventListener('click', () => MM.intro.open());
       $('menu-btn').addEventListener('click', () => { document.body.classList.toggle('panel-open'); setTimeout(() => MM.map.invalidateSize(), 260); });
       if (window.innerWidth > 900) document.body.classList.add('panel-open');

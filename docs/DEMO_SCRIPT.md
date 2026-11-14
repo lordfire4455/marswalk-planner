@@ -13,19 +13,22 @@ Record the screen at 1920 × 1080 with live imagery on. Lines in quotes are the 
 | 19–25 s | Click **3D preview**, then **Fly the route**. | "Preview the walk in 3D before you open the airlock." |
 | 25–30 s | Open the EVA briefing. End on the title. | "Marswalk Planner. Walk safe. Do science. Come home." |
 
-## Live pitch to judges (about 3 minutes)
+## Live pitch to judges (about 3½ minutes)
 
 1. **The problem (20 s).** NASA has mapped Jezero for decades with different instruments, in different archives and formats. An astronaut needs one answer: can I walk there safely today?
 2. **Demo mission (40 s).** Start on the mission overview and point at the "Built to the challenge brief" row: one site, five kinds of NASA data, crew safety, science on the route. Then click *Watch a demo mission*. Explain the story: Perseverance left ten sample tubes on the ground at Three Forks. A crew could pick them up in one EVA. Show the route, the 5.2 km distance, the GO WITH CAUTION verdict and why: terrain blocks the radio line of sight to base for much of the walk, so a relay is needed.
 3. **It reacts to rules (30 s).** Change the slope limit to 15° on the *Bright Angel sortie* and watch the route move. Set the start time to 16:30 and show the NO-GO for darkness. Switch the date to June 2026 and show the dust-season caution.
-4. **Science on the way (30 s).** Show *Science along the way* offering a nearby target and add it. Turn on the CRISM carbonate layer and point at the green ring along the crater margin: the "bathtub ring" of the ancient lake.
-5. **Trust (30 s).** Open *Data & methods*. Eleven datasets, six missions. The clock matches NASA's sol numbers. The elevation model matches the rover's own positions at 708 waypoints (mean difference 0.9 m, standard deviation 3.4 m). Speed and energy models are the ones NASA and MIT use in SEXTANT.
-6. **Works on Mars (20 s).** Turn off Wi-Fi and open the copy of the app saved on the laptop (`index.html`). Everything except the live imagery still works, because a crew on Mars cannot wait 20 minutes for a server on Earth.
-7. **Close (10 s).** Open the EVA briefing and the 3D fly-through.
+4. **The crew learns something (30 s).** Click *Draw a no-go zone*, draw a box over the route ("boulder field") and watch the route bend around it. Then press *Compare* and show the safest, fastest and science-rich options as dashed lines on the map.
+5. **Science on the way (30 s).** Show *Science along the way* offering a nearby target and add it. Turn on the CRISM carbonate layer and point at the green ring along the crater margin: the "bathtub ring" of the ancient lake.
+6. **Trust (30 s).** Point at the tags on each number ("NASA terrain" or "Model") and open *How sure are we?*. Then open *Data & methods*. Eleven datasets, six missions. The clock matches NASA's sol numbers. The elevation model matches the rover's own positions at 708 waypoints (mean difference 0.9 m, standard deviation 3.4 m). Speed and energy models are the ones NASA and MIT use in SEXTANT.
+7. **Works on Mars (20 s).** Turn off Wi-Fi and open the copy of the app saved on the laptop (`index.html`). Everything except the live imagery still works, because a crew on Mars cannot wait 20 minutes for a server on Earth.
+8. **Close (10 s).** Open the EVA briefing and the 3D fly-through.
 
 ## Questions judges may ask
 
 - **Is the data real?** Yes. Nothing is simulated. Every product ID is in docs/DATA_SOURCES.md.
 - **How accurate is the route?** As good as a 20 m elevation model allows. It avoids steep ground but cannot see single rocks, so the HiRISE layer is there for a visual check.
 - **Why Curiosity weather for Jezero?** Perseverance's public feed is not updated every sol. Curiosity has 14 years of data at a similar distance from the equator, so it gives the best seasonal norm. When MEDA data exists for the same season, the app uses it instead.
+- **If a judge has only a minute?** Press *Tour* in the top bar, then the play button. It walks through the whole app on its own.
+- **What if the crew sees something the orbiter missed?** Draw a no-go zone or log a field report with its confidence level. Routes re-plan at once, and the reports go into the share link, the briefing and the GeoJSON.
 - **What is new here?** NASA's Mars Trek shows layers. This tool makes a decision from them: a route, a verdict and a briefing.

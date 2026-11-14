@@ -35,6 +35,7 @@
     <div class="tm"><span class="tm-k">Dust risk</span><span class="tm-v" id="tm-dust">–</span></div>
   </div>
   <div class="top-actions">
+    <button id="btn-tour" class="ghost-btn" title="A one-minute guided tour of the planner" aria-label="Guided tour"><span class="lbl-long">Tour</span><span class="lbl-short" aria-hidden="true">?</span></button>
     <button id="btn-intro" class="ghost-btn" title="Reopen the mission overview" aria-label="Mission overview"><span class="lbl-long">Mission overview</span><span class="lbl-short" aria-hidden="true">i</span></button>
     <button id="btn-about" class="ghost-btn">Data &amp; methods</button>
   </div>
@@ -82,17 +83,41 @@
             <button data-v="careful">Careful</button><button data-v="nominal" class="on">Nominal</button><button data-v="brisk">Brisk</button>
           </div>
         </div>
+        <div class="field">
+          <label>Route priority</label>
+          <div class="seg" id="opt-mode">
+            <button data-v="safe" class="on" title="Avoid sloping ground as much as possible">Safest</button><button data-v="fast" title="Shortest walking time that still respects the slope limit">Fastest</button>
+          </div>
+        </div>
         <div class="field two">
           <div><label for="opt-start">Leave airlock (local time)</label><input type="time" id="opt-start" value="09:00"></div>
           <div><label for="opt-limit">Suit limit (hours)</label><input type="number" id="opt-limit" value="8" min="2" max="10" step="0.5"></div>
         </div>
+        <div class="field two">
+          <div><label for="opt-crew">Crew on this EVA</label><input type="number" id="opt-crew" value="2" min="1" max="6" step="1"></div>
+          <div><label for="opt-o2">O₂ per suit (kg)</label><input type="number" id="opt-o2" value="0.6" min="0.2" max="5" step="0.1" title="Usable oxygen in each portable life-support system. NASA's ISS spacesuit carries about 0.5 kg in its primary tank."></div>
+        </div>
         <label class="switch-row"><input type="checkbox" id="opt-round" checked><span>Walk back to base at the end</span></label>
+      </div>
+
+      <div class="block" id="field-block">
+        <div class="block-h">Hazards and field reports
+          <span class="block-actions"><button id="btn-field-clear" class="mini-btn" title="Remove all zones and reports" hidden>Clear</button></span>
+        </div>
+        <div class="field-tools">
+          <button id="btn-zone" class="tool-btn"><i aria-hidden="true">⬠</i><span><b>Draw a no-go zone</b><small>Routes re-plan around it</small></span></button>
+          <button id="btn-obs" class="tool-btn"><i aria-hidden="true">✎</i><span><b>Add a field report</b><small>Note what the crew found</small></span></button>
+        </div>
+        <ul id="field-list" class="field-list"></ul>
+        <div id="field-empty" class="hint">Mark ground the crew must not cross, or log a hazard, a find or a landmark with how sure you are. Everything is saved in this browser and in the share link.</div>
       </div>
 
       <div class="block" id="summary-block" hidden>
         <div class="block-h">Route summary</div>
         <div id="verdict" class="verdict"></div>
+        <p id="takeaway" class="takeaway"></p>
         <div class="stats" id="stats"></div>
+        <div class="trust-legend" id="trust-legend"><span><em class="tt data">NASA terrain</em> from the elevation model</span><span><em class="tt model">Model</em> planning estimate</span><span><em class="tt plan">Your input</em></span></div>
         <div class="classbar" id="classbar"></div>
         <div class="classbar-legend" id="classbar-legend"></div>
         <ul class="checks" id="checks"></ul>
@@ -102,6 +127,21 @@
           <button id="btn-share" class="ghost-btn">Copy link</button>
           <button id="btn-export" class="ghost-btn">GeoJSON</button>
         </div>
+        <div class="cmp" id="cmp">
+          <button id="btn-compare" class="ghost-btn cmp-btn"><span aria-hidden="true">⇄</span> Compare safest, fastest and science-rich routes</button>
+          <div id="cmp-out"></div>
+        </div>
+        <details class="howsure" id="howsure">
+          <summary>How sure are we?</summary>
+          <ul>
+            <li><span class="lvl ok">Checked against NASA</span><b>Terrain heights.</b> The CTX elevation model agrees with Perseverance's own localization at all 708 rover waypoints: mean difference 0.9 m, spread 3.4 m.</li>
+            <li><span class="lvl ok">Checked against NASA</span><b>Mars clock.</b> Reproduces the sol numbers and sunrise times in NASA's Perseverance and Curiosity weather feeds.</li>
+            <li><span class="lvl ok">Checked against NASA</span><b>Science targets.</b> Each sample site is the rover's surveyed position on the sol the sample was taken.</li>
+            <li><span class="lvl model">Model</span><b>Time, energy and oxygen.</b> Apollo-derived walking and metabolic models (Marquez 2008; Santee et al. 2001), as in NASA / MIT SEXTANT. Planning estimates, never measured on Mars.</li>
+            <li><span class="lvl model">Model</span><b>Weather.</b> A seasonal outlook from 4,745 sols of Curiosity data and Perseverance reports, not a forecast.</li>
+            <li><span class="lvl no">Not visible</span><b>Rocks and ripples under 20 m.</b> The grid cannot see them. Check the last metres in the HiRISE layer and log what the crew finds as field reports.</li>
+          </ul>
+        </details>
       </div>
 
       <div class="block" id="nearby-block" hidden>
@@ -176,6 +216,12 @@
       <canvas id="profile-cv"></canvas>
     </div>
     <button id="profile-open" class="ghost-btn profile-open" hidden>Show elevation profile</button>
+    <div id="draw-bar" class="draw-bar" hidden>
+      <span id="draw-msg"></span>
+      <button id="draw-undo" class="mini-btn">Undo corner</button>
+      <button id="draw-finish" class="mini-btn hot">Finish</button>
+      <button id="draw-cancel" class="mini-btn">Cancel</button>
+    </div>
     <div id="busy" class="busy" hidden><span class="spin"></span>Finding the safest route…</div>
   </section>
 </main>
@@ -194,6 +240,7 @@
       <header class="intro-top">
         <span class="brand-mark" aria-hidden="true"></span>
         <span class="intro-event">NASA Space Apps Challenge <i>·</i> Interplanetary Survival Guide: Martian Map</span>
+        <a class="intro-gh" href="https://github.com/lordfire4455/marswalk-planner" target="_blank" rel="noopener">Open source on GitHub ↗</a>
         <button class="intro-skip" data-go="plan" data-plain="1">Skip to planner →</button>
       </header>
 
@@ -204,6 +251,7 @@
           <p class="intro-lead">One mission-ready map that fuses data from six NASA missions to keep astronauts safe on foot while getting the most science out of every hour on Mars.</p>
           <div class="intro-cta">
             <button class="intro-launch" id="intro-launch" data-go="plan" data-plain="1">Launch Mission Planner <span aria-hidden="true">→</span></button>
+            <button class="intro-demo" id="intro-tour"><span aria-hidden="true">?</span> Take the 1-minute tour</button>
             <button class="intro-demo" id="intro-demo"><span aria-hidden="true">▶</span> Watch a demo mission</button>
           </div>
           <div class="intro-stats" id="intro-stats"></div>
@@ -332,10 +380,12 @@
 <script src="js/layers.js"></script>
 <script src="js/science.js"></script>
 <script src="js/conditions.js"></script>
+<script src="js/field.js"></script>
 <script src="js/planner.js"></script>
 <script src="js/briefing.js"></script>
 <script src="js/view3d.js"></script>
 <script src="js/intro.js"></script>
+<script src="js/tour.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 **NASA Space Apps Challenge: "Interplanetary Survival Guide: Martian Map"**
 
-**Live site:** https://marswalk-map.netlify.app
+**Live site:** https://marswalk-map.netlify.app · **Code:** https://github.com/lordfire4455/marswalk-planner
 
 A layered map of Jezero Crater that turns data from six NASA missions into one decision: **can a crew safely walk this route today, and what science can they do on the way?**
 
@@ -34,6 +34,12 @@ then open http://localhost:8000.
 | **Go / no-go checks** | Suit time and reserve, terrain, daylight, temperature, dust-storm season, radio line of sight to base, one-way pickup. |
 | **EVA numbers** | Distance, walking time, climb, metabolic energy, oxygen used, farthest point from base. |
 | **Elevation profile** | Coloured by slope class, with a radio line-of-sight strip. Hover to find any point on the map. |
+| **No-go zones** | Draw an area the crew must not cross (soft sand, boulders, a cliff edge); every route re-plans around it. |
+| **Field reports** | Log a hazard, science find, resource, landmark or radio note with a confidence label (Measured, Observed, Estimated), author and Mars + Earth time. A hazard can keep routes 50 to 200 m away. Saved in the browser, the share link and the GeoJSON. |
+| **Route comparison** | Safest, fastest and science-rich options side by side, drawn on the map, with one click to switch. |
+| **Crew and oxygen** | Crew size and usable O₂ per suit, checked against the walk with a 25% reserve; a solo EVA is flagged. |
+| **Key takeaway and trust labels** | One plain sentence per plan; every number tagged "NASA terrain", "Model" or "Your input"; a "How sure are we?" panel listing what was checked against NASA. |
+| **Guided tour** | A 14-step, one-minute spotlight tour from the mission overview or the top bar. |
 | **Mission overview** | An entrance screen that explains the project, shows live Jezero time, maps each challenge requirement to a feature, and jumps into any of the four views. |
 | **3D preview** | The route draped over a solid block of real terrain, with a fly-through. |
 | **Science targets** | 19 Perseverance sites (17 sample sites, the Three Forks sample depot and the landing site) plus two Ingenuity sites, all at their real surveyed positions. |
@@ -57,10 +63,12 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 ## How it works
 
 - `js/terrain.js`: unpacks the elevation model, computes slope (Horn's method) and shaded relief, samples elevation, checks line of sight including the curvature of Mars.
-- `js/router.js`: A* route search with 16 directions of movement. Step cost is walking time multiplied by a slope hazard factor.
+- `js/router.js`: A* route search with 16 directions of movement. Step cost is walking time multiplied by a slope hazard factor (strong for "Safest", weak for "Fastest"). Cells inside no-go zones are impassable.
 - `js/eva.js`: walking speed as a function of slope from Apollo 14 traverse data (Marquez 2008) and metabolic cost from Santee et al. (2001) at Mars gravity. These are the models used by the NASA / MIT SEXTANT traverse planner.
 - `js/mars-time.js`: Mars Sol Date, local solar time, solar longitude, sunrise and sunset (Allison & McEwen 2000, the algorithm behind NASA's Mars24).
 - `js/conditions.js`, `js/planner.js`, `js/science.js`, `js/layers.js`, `js/briefing.js`, `js/view3d.js`: weather, planning, targets, map layers, briefing, 3D.
+- `js/field.js`: no-go zones and field reports; burns zones into a mask over the elevation grid that the router treats as impassable.
+- `js/tour.js`: the guided tour.
 - `js/intro.js`: the mission overview (entrance screen). `js/app.js`: start-up, tabs, ready-made missions and the Data & methods window.
 - `tools/build_data.py`: rebuilds everything in `data/` from the raw NASA files.
 

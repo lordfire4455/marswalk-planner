@@ -216,6 +216,7 @@
       const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go, !!b.dataset.plain, b.dataset.focus);
     });
     $('intro-demo').addEventListener('click', () => { close(); MM.app.runPreset('depot'); });
+    $('intro-tour').addEventListener('click', () => { close(); MM.tour.start(); });
     $('intro-about').addEventListener('click', () => MM.app.about());
     window.addEventListener('resize', () => { if (!box.hidden) { layoutArt(); cue(); } });
     // The traverse drawing belongs to the hero: it fades away as the page scrolls to the cards.

@@ -56,7 +56,7 @@
   ];
 
   /** Nearest passable cell to (lat, lon) within ~radius cells, or -1. */
-  function snap(lat, lon, maxSlope, radius) {
+  function snap(lat, lon, maxSlope, radius, blocked) {
     const T = MM.terrain;
     const c0 = Math.round(T.colOf(lon)), r0 = Math.round(T.rowOf(lat));
     let best = -1, bd = Infinity;
@@ -66,7 +66,7 @@
         const c = c0 + dc, r = r0 + dr;
         if (c < 1 || r < 1 || c >= T.w - 1 || r >= T.h - 1) continue;
         const i = r * T.w + c;
-        if (T.slope[i] > maxSlope) continue;
+        if (T.slope[i] > maxSlope || (blocked && blocked[i])) continue;
         const d = dc * dc + dr * dr;
         if (d < bd) { bd = d; best = i; }
       }
@@ -85,9 +85,11 @@
     const { w, h, z, slope, dx, dy } = T;
     ensure(w * h);
     if (!T.inside(a[0], a[1]) || !T.inside(b[0], b[1])) return { ok: false, reason: 'outside' };
-    const start = snap(a[0], a[1], maxSlope), goal = snap(b[0], b[1], maxSlope);
-    if (start < 0) return { ok: false, reason: 'start-steep' };
-    if (goal < 0) return { ok: false, reason: 'goal-steep' };
+    const blocked = opts.blocked || null;                       // 1 = inside a crew-drawn no-go zone
+    const start = snap(a[0], a[1], maxSlope, 8, blocked), goal = snap(b[0], b[1], maxSlope, 8, blocked);
+    const inZone = (p) => blocked && blocked[T.cellOf(p[0], p[1])];
+    if (start < 0) return { ok: false, reason: inZone(a) ? 'start-zone' : 'start-steep' };
+    if (goal < 0) return { ok: false, reason: inZone(b) ? 'goal-zone' : 'goal-steep' };
 
     const moves = MOVES.map(([dc, dr, mid]) => ({
       dc, dr, off: dr * w + dc, len: Math.sqrt(dc * dx * dc * dx + dr * dy * dr * dy),
@@ -100,7 +102,9 @@
       const ex = (c - gc) * dx, ey = (r - gr) * dy;
       return Math.sqrt(ex * ex + ey * ey) / vmax;
     };
-    const hazard = (s) => { const q = s / maxSlope; return 1 + 2.5 * q * q; };
+    // Hazard weight: 2.5 is the default "safest" balance; a small weight gives the fastest legal route.
+    const K = opts.hazardK != null ? opts.hazardK : 2.5;
+    const hazard = (s) => { const q = s / maxSlope; return 1 + K * q * q; };
 
     queryId++; heapN = 0;
     g[start] = 0; from[start] = -1; stamp[start] = queryId;
@@ -122,6 +126,7 @@
         const sn = slope[ni];
         if (sn > maxSlope) continue;
         if (mv.mid && (slope[cur + mv.mid[0]] > maxSlope || slope[cur + mv.mid[1]] > maxSlope)) continue;
+        if (blocked && (blocked[ni] || (mv.mid && (blocked[cur + mv.mid[0]] || blocked[cur + mv.mid[1]])))) continue;
         const dz = z[ni] - zc;
         const grade = Math.atan2(dz, mv.len) / D2R;
         const v = E.speed(grade, pf);
