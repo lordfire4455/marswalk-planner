@@ -592,9 +592,6 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--sky); ou
 .tour-x { background: none; border: 1px solid var(--line-2); border-radius: 50%; width: 26px; height: 26px; color: var(--ink-2); line-height: 1; }
 .tour-card h3 { font-size: 17px; margin: 6px 0 6px; }
 .tour-card p { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
-.tour-bars { display: grid; grid-auto-flow: column; gap: 3px; margin: 12px 0 10px; }
-.tour-bars i { height: 3px; border-radius: 2px; background: var(--line-2); cursor: pointer; }
-.tour-bars i.on { background: var(--sky); }
 .tour-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .tour-back { background: none; border: 0; color: var(--ink-2); padding: 6px 4px; }
 .tour-back:disabled { opacity: .3; cursor: default; }
@@ -606,6 +603,13 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--sky); ou
 .brief-take { font-size: 13.5px; margin: 0 0 14px; padding: 9px 12px; border-left: 3px solid var(--sky); background: rgba(89, 195, 255, .07); border-radius: 0 8px 8px 0; }
 @media print { .brief-take { background: #f2f6fa; border-left-color: #333; } }
 @media (max-width: 480px) { .telemetry { display: none; } .top-actions { margin-left: auto; } }
-.tour-bars i.cur { background: var(--sky); }
-.tour.playing .tour-bars i.cur { background: linear-gradient(var(--sky), var(--sky)) left / 0% 100% no-repeat, var(--line-2); animation: tourfill 8s linear forwards; }
-@keyframes tourfill { to { background-size: 100% 100%, auto; } }
+
+/* tour progress: the current step is a longer track that fills smoothly while autoplay runs */
+.tour-bars { display: flex; gap: 4px; margin: 12px 0 10px; }
+.tour-bars i { position: relative; flex: 1 1 0; height: 4px; border-radius: 2px; background: var(--line-2); cursor: pointer; overflow: hidden; transition: flex-grow .35s ease; }
+.tour-bars i.on { background: var(--sky); }
+.tour-bars i.cur { flex-grow: 4; background: rgba(89, 195, 255, .22); }
+.tour-bars i.cur::after { content: ''; position: absolute; inset: 0; background: var(--sky); transform-origin: left center; transform: scaleX(1); }
+.tour.playing .tour-bars i.cur::after { transform: scaleX(0); animation: tourfill 8s linear forwards; }
+@keyframes tourfill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .tour-bars i { transition: none; } }
