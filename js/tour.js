@@ -102,7 +102,8 @@
     $('tour-n').textContent = 'Tour · ' + (i + 1) + ' / ' + STEPS.length;
     $('tour-title').textContent = s.title;
     $('tour-text').textContent = s.text;
-    [...$('tour-bars').children].forEach((b, k) => b.classList.toggle('on', k <= i));
+    [...$('tour-bars').children].forEach((b, k) => { b.classList.toggle('on', k < i); b.classList.remove('cur'); });
+    const cur = $('tour-bars').children[i]; void cur.offsetWidth; cur.classList.add('cur');   // restart the autoplay fill
     $('tour-back').disabled = i === 0;
     $('tour-next').textContent = s.last ? 'Start planning' : 'Next →';
     el.classList.remove('busy');
@@ -141,6 +142,7 @@
     $('tour-play').textContent = on ? '❚❚' : '▶';
     $('tour-play').setAttribute('aria-label', on ? 'Pause the tour' : 'Play the tour automatically');
     el.classList.toggle('playing', on);
+    const cur = $('tour-bars').children[i]; if (cur) { cur.classList.remove('cur'); void cur.offsetWidth; cur.classList.add('cur'); }
     if (on) arm(); else clearTimeout(timer);
   }
 

@@ -238,7 +238,7 @@ label.layer:not(.on) .layer-note { display: none; }
 .toast.warn { border-left-color: var(--caution); } .toast.error { border-left-color: var(--nogo); } .toast.ok { border-left-color: var(--go); }
 .toast.out { opacity: 0; }
 @keyframes tin { from { transform: translateX(20px); opacity: 0; } }
-.modal { position: fixed; inset: 0; z-index: 3000; background: rgba(4, 6, 10, .72); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 20px; overflow: auto; }
+.modal { position: fixed; inset: 0; z-index: 2147483646; background: rgba(4, 6, 10, .72); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 20px; overflow: auto; }
 .modal-card { position: relative; background: var(--panel); border: 1px solid var(--line-2); border-radius: 16px; width: min(560px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 28px 30px 22px; box-shadow: 0 30px 80px rgba(0, 0, 0, .7); }
 .modal.wide .modal-card { width: min(940px, 100%); }
 .modal-x { position: absolute; right: 12px; top: 10px; background: none; border: 0; font-size: 24px; color: var(--ink-3); line-height: 1; padding: 4px 8px; }
@@ -583,7 +583,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--sky); ou
 .conf-opt:has(input:checked) { border-color: var(--mars); }
 
 /* ---------- guided tour ---------- */
-.tour { position: fixed; inset: 0; z-index: 3500; pointer-events: none; }
+.tour { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; }
 .tour-spot { position: fixed; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(4, 6, 10, .62), 0 0 0 2px var(--sky), 0 0 24px rgba(89, 195, 255, .5); transition: left .3s, top .3s, width .3s, height .3s; pointer-events: none; }
 .tour.centered .tour-spot { left: 50% !important; top: 50% !important; width: 0 !important; height: 0 !important; box-shadow: 0 0 0 9999px rgba(4, 6, 10, .7); }
 .tour-card { position: fixed; width: min(340px, calc(100vw - 24px)); background: #111827; border: 1px solid rgba(89, 195, 255, .4); border-radius: 14px; padding: 14px 16px 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .7); pointer-events: auto; transition: left .3s, top .3s, opacity .2s; }
@@ -606,3 +606,6 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--sky); ou
 .brief-take { font-size: 13.5px; margin: 0 0 14px; padding: 9px 12px; border-left: 3px solid var(--sky); background: rgba(89, 195, 255, .07); border-radius: 0 8px 8px 0; }
 @media print { .brief-take { background: #f2f6fa; border-left-color: #333; } }
 @media (max-width: 480px) { .telemetry { display: none; } .top-actions { margin-left: auto; } }
+.tour-bars i.cur { background: var(--sky); }
+.tour.playing .tour-bars i.cur { background: linear-gradient(var(--sky), var(--sky)) left / 0% 100% no-repeat, var(--line-2); animation: tourfill 8s linear forwards; }
+@keyframes tourfill { to { background-size: 100% 100%, auto; } }
