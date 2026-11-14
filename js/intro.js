@@ -211,25 +211,38 @@
     safe(() => drawLayers(relief, hazard, elevation));
     safe(() => drawScience(relief));
 
-    const box = $('intro');
+    const box = $('intro'), sc = $('intro-scroll');
     box.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go, !!b.dataset.plain, b.dataset.focus);
+      const b = e.target.closest('[data-go]'); if (b) { go(b.dataset.go, !!b.dataset.plain, b.dataset.focus); return; }
+      const sTo = e.target.closest('[data-scroll]');
+      if (sTo) { const id = sTo.dataset.scroll; if (id === 'top') sc.scrollTo({ top: 0, behavior: 'smooth' }); else $(id).scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      if (e.target.closest('[data-about]')) MM.app.about();
     });
+    $('intro-tour-top').addEventListener('click', () => { close(); MM.tour.start(); });
     $('intro-demo').addEventListener('click', () => { close(); MM.app.runPreset('depot'); });
     $('intro-tour').addEventListener('click', () => { close(); MM.tour.start(); });
     $('intro-about').addEventListener('click', () => MM.app.about());
     window.addEventListener('resize', () => { if (!box.hidden) { layoutArt(); cue(); } });
     // The traverse drawing belongs to the hero: it fades away as the page scrolls to the cards.
-    const over = box.querySelector('.intro-art.over'), sc = $('intro-scroll');
+    const over = box.querySelector('.intro-art.over');
     const globe = $('intro-globe');
     sc.addEventListener('scroll', () => {
       over.style.setProperty('--fade', Math.max(0, 1 - sc.scrollTop / 260).toFixed(2));
       globe.style.setProperty('--fade', Math.max(0.12, 1 - sc.scrollTop / 520).toFixed(2));
-      cue();
+      cue(); spy();
     }, { passive: true });
     // The globe sits behind the scrolling page so it can be dragged; pass mouse-wheel scrolling over it on to the page.
     box.addEventListener('wheel', (e) => { if (!sc.contains(e.target)) sc.scrollTop += e.deltaY; }, { passive: true });
     $('intro-more-btn').addEventListener('click', () => box.querySelector('.intro-cards').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }
+
+  /** Header: a glass bar once the page scrolls, and the link for the section in view lit up. */
+  function spy() {
+    const sc = $('intro-scroll'), top = $('intro-top');
+    top.classList.toggle('stuck', sc.scrollTop > 8);
+    let cur = 'top';
+    ['intro-brief', 'intro-datasec'].forEach((id) => { const el = $(id); if (el && el.getBoundingClientRect().top < window.innerHeight * 0.45) cur = id; });
+    $('snav').querySelectorAll('[data-scroll]').forEach((a) => a.classList.toggle('on', a.dataset.scroll === cur));
   }
 
   /** On short screens the cards start below the fold: show a pointer to them until the page is scrolled. */
@@ -250,7 +263,7 @@
     $('intro-scroll').scrollTop = 0;
     box.querySelector('.intro-art.over').style.removeProperty('--fade');
     $('intro-globe').style.removeProperty('--fade');
-    layoutArt(); tick(); cue();
+    layoutArt(); tick(); cue(); spy();
     try { drawConditions(); } catch (err) { console.warn('Overview picture skipped:', err); }
     clearInterval(timer); timer = setInterval(tick, 1000);
     if (MM.globe) MM.globe.mount($('intro-globe'));
