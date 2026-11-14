@@ -18,6 +18,7 @@
   const hm = (sec) => { const m = Math.round(sec / 60); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min'; };
   const hmShort = (sec) => { const m = Math.round(sec / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') + ' h'; };
   const km = (m) => (m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m');
+  const BASE_ICO = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 7.2 8 2.8l5.5 4.4v6H2.5z"/><path d="M6.4 13.2V9.6h3.2v3.6"/></svg>';
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ------------------------------------------------------------------ stops
@@ -223,7 +224,7 @@
     S.stops.forEach((s, i) => {
       const mk = L.marker([s.lat, s.lon], {
         draggable: true, pane: 'pins', zIndexOffset: 1000,
-        icon: L.divIcon({ className: '', html: `<div class="spin-pin ${i === 0 ? 'base' : ''}">${i === 0 ? '⌂' : i}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }),
+        icon: L.divIcon({ className: '', html: `<div class="spin-pin ${i === 0 ? 'base' : ''}">${i === 0 ? BASE_ICO : i}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
       });
       mk.bindTooltip(esc(s.name) + ' (drag to move, click to remove)', { direction: 'top', offset: [0, -12] });
       mk.bindPopup(`<div class="pop">
@@ -255,7 +256,7 @@
       if (i > 0 && info && info.arrive != null) meta = MM.time.hhmm(S.startH + info.arrive / 3600) + ' LMST · ' + km(info.d);
       if (i > 0 && plan && info && info.arrive == null) meta = 'Not reachable';
       return `<li class="stop" data-i="${i}">
-        <span class="stop-n ${i === 0 ? 'base' : ''}">${i === 0 ? '⌂' : i}</span>
+        <span class="stop-n ${i === 0 ? 'base' : ''}">${i === 0 ? BASE_ICO : i}</span>
         <span class="stop-main"><span class="stop-name">${esc(s.name)}</span><span class="stop-meta">${meta}</span></span>
         ${i > 0 ? `<label class="stop-min" title="Minutes of work at this stop"><input type="number" min="0" max="240" step="5" value="${s.stopMin}"><span>min</span></label>` : '<span class="stop-min"></span>'}
         <span class="stop-btns"><button data-act="up" title="Earlier" ${i === 0 ? 'disabled' : ''}>↑</button><button data-act="down" title="Later" ${i === S.stops.length - 1 ? 'disabled' : ''}>↓</button><button data-act="del" title="Remove">×</button></span>

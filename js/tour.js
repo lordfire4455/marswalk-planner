@@ -38,7 +38,7 @@
     { sel: '#field-block', title: 'No-go zones and field reports', text: 'Draw an area the crew must not cross and the route goes around it. Log what the crew finds with a confidence label: Measured, Observed or Estimated.' },
     { sel: '#cmp', before: async () => { await ensureRoute(); if (!$('cmp-out').innerHTML) await MM.planner.compareRoutes(); }, title: 'Compare route options', text: 'Safest, fastest and science-rich routes side by side, also drawn on the map as dashed lines. One click switches to the one you prefer.' },
     { sel: '#btn-3d', parent: '.row-btns', title: '3D fly-through and EVA briefing', text: 'See the route on real terrain in 3D, print a one-page briefing for the crew, share the plan as a link, or export it as GeoJSON.' },
-    { sel: '.tabs', title: 'More to explore', text: 'Layers: NASA imagery, minerals and heat. Science: every Perseverance sample site. Conditions: the Mars clock, seasons, dust risk and weather.' },
+    { sel: ['#topnav', '.tabs'], title: 'More to explore', text: 'Layers: NASA imagery, minerals and heat. Science: every Perseverance sample site. Conditions: the Mars clock, seasons, dust risk and weather.' },
     { title: 'Ready for your own Marswalk', text: 'Click the map to place a base and add stops, or pick another ready-made mission. The Mission overview and this tour are always in the top bar.', last: true },
   ];
 

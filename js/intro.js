@@ -221,7 +221,14 @@
     window.addEventListener('resize', () => { if (!box.hidden) { layoutArt(); cue(); } });
     // The traverse drawing belongs to the hero: it fades away as the page scrolls to the cards.
     const over = box.querySelector('.intro-art.over'), sc = $('intro-scroll');
-    sc.addEventListener('scroll', () => { over.style.setProperty('--fade', Math.max(0, 1 - sc.scrollTop / 260).toFixed(2)); cue(); }, { passive: true });
+    const globe = $('intro-globe');
+    sc.addEventListener('scroll', () => {
+      over.style.setProperty('--fade', Math.max(0, 1 - sc.scrollTop / 260).toFixed(2));
+      globe.style.setProperty('--fade', Math.max(0.12, 1 - sc.scrollTop / 520).toFixed(2));
+      cue();
+    }, { passive: true });
+    // The globe sits behind the scrolling page so it can be dragged; pass mouse-wheel scrolling over it on to the page.
+    box.addEventListener('wheel', (e) => { if (!sc.contains(e.target)) sc.scrollTop += e.deltaY; }, { passive: true });
     $('intro-more-btn').addEventListener('click', () => box.querySelector('.intro-cards').scrollIntoView({ behavior: 'smooth', block: 'center' }));
   }
 
@@ -242,16 +249,19 @@
     document.body.classList.add('intro-open');
     $('intro-scroll').scrollTop = 0;
     box.querySelector('.intro-art.over').style.removeProperty('--fade');
+    $('intro-globe').style.removeProperty('--fade');
     layoutArt(); tick(); cue();
     try { drawConditions(); } catch (err) { console.warn('Overview picture skipped:', err); }
     clearInterval(timer); timer = setInterval(tick, 1000);
-    $('intro-launch').focus({ preventScroll: true });
+    if (MM.globe) MM.globe.mount($('intro-globe'));
+    box.setAttribute('tabindex', '-1'); box.focus({ preventScroll: true });   // keyboard users start inside the dialog, without a ring on the button
   }
 
   function close() {
     const box = $('intro');
     if (box.hidden || box.classList.contains('leaving')) return;
     clearInterval(timer);
+    if (MM.globe) setTimeout(() => MM.globe.pause(), 420);
     box.classList.add('leaving');
     document.body.classList.remove('intro-open');
     setTimeout(() => { box.hidden = true; box.classList.remove('leaving'); }, 420);

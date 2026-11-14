@@ -89,9 +89,9 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 - Everything is plain HTML, CSS and JavaScript. There is no build step and nothing to install. Edit a file, reload the page.
 - `index.html` loads the scripts in order. Each module adds itself to `window.MM` (for example `MM.planner`, `MM.terrain`).
 - `data/*.js` are generated files. Change them by running `python tools/build_data.py <folder with the raw NASA files>`, not by hand.
-- `vendor/` holds Leaflet and three.js, so the app runs offline.
+- `vendor/` holds Leaflet, three.js and the two web fonts, so the app runs offline.
 - Check a change in Chrome and on a phone-sized window (the layout changes below 900 px wide) before you push.
 
 ## Credits
 
-Map library: [Leaflet](https://leafletjs.com) (BSD-2). 3D: [three.js](https://threejs.org) (MIT). Data courtesy NASA/JPL-Caltech, USGS Astrogeology, University of Arizona, JHU-APL, Arizona State University, MSSS, and CAB (CSIC-INTA). NASA does not endorse this project.
+Map library: [Leaflet](https://leafletjs.com) (BSD-2). 3D: [three.js](https://threejs.org) (MIT). Fonts: Space Grotesk and DM Sans (SIL Open Font License), bundled in `vendor/fonts/`. Overview globe: NASA Viking Orbiter colour mosaic (MDIM 2.1) via NASA Solar System Treks. Data courtesy NASA/JPL-Caltech, USGS Astrogeology, University of Arizona, JHU-APL, Arizona State University, MSSS, and CAB (CSIC-INTA). NASA does not endorse this project.

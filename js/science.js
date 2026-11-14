@@ -5,9 +5,9 @@
   'use strict';
   const MM = (window.MM = window.MM || {});
   const KIND = {
-    sample: { label: 'Sample site', icon: '◆', color: '#ffd23f' },
-    depot: { label: 'Sample depot', icon: '★', color: '#ff6b35' },
-    landmark: { label: 'Landmark', icon: '●', color: '#59c3ff' },
+    sample: { label: 'Sample site', icon: '◆', color: '#f2c14e' },
+    depot: { label: 'Sample depot', icon: '★', color: '#f4845f' },
+    landmark: { label: 'Landmark', icon: '●', color: '#5fd3ef' },
   };
   let targets = [], markers = {}, filter = 'all';
 

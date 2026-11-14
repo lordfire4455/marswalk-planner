@@ -107,9 +107,11 @@
       MM.field.init();
       MM.planner.init();
 
-      $('presets').innerHTML = PRESETS.map((p) => `<button class="preset" data-preset="${p.id}"><span class="preset-ico">${p.icon}</span><span><b>${p.title}</b><small>${p.sub}</small></span></button>`).join('');
+      $('presets').innerHTML = PRESETS.map((p, i) => `<button class="preset" data-preset="${p.id}"><span class="preset-ico">${String(i + 1).padStart(2, '0')}</span><span><b>${p.title}</b><small>${p.sub}</small></span></button>`).join('');
       $('presets').addEventListener('click', (e) => { const b = e.target.closest('[data-preset]'); if (b) runPreset(b.dataset.preset); });
-      document.querySelector('.tabs').addEventListener('click', (e) => { const t = e.target.closest('.tab'); if (t) showTab(t.dataset.tab); });
+      const onTab = (e) => { const t = e.target.closest('.tab'); if (t) showTab(t.dataset.tab); };
+      document.querySelector('.tabs').addEventListener('click', onTab);
+      $('topnav').addEventListener('click', onTab);
       $('btn-about').addEventListener('click', about);
       $('modal-x').addEventListener('click', closeModal);
       $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });

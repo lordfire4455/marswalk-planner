@@ -113,7 +113,7 @@
       }
     }
     const last = R.waypoints[R.waypoints.length - 1];
-    grp.addLayer(L.marker([last[2], last[1]], { pane: 'tracks', icon: L.divIcon({ className: '', html: '<div class="rover-pin" title="Perseverance">🤖</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) })
+    grp.addLayer(L.marker([last[2], last[1]], { pane: 'tracks', icon: L.divIcon({ className: '', html: '<div class="rover-pin" title="Perseverance rover, latest position"><i></i><span>Perseverance</span></div>', iconSize: [14, 14], iconAnchor: [7, 7] }) })
       .bindTooltip('Perseverance position on sol ' + last[0] + ' (latest bundled data): ' + R.total_km + ' km driven', { direction: 'top' }));
     return grp;
   }
