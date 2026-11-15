@@ -104,7 +104,8 @@
         </div>
         <div class="field two">
           <div><label for="opt-crew">Crew on this EVA</label><input type="number" id="opt-crew" value="2" min="1" max="6" step="1"></div>
-          <div><label for="opt-o2">O₂ per suit (kg)</label><input type="number" id="opt-o2" value="0.6" min="0.2" max="5" step="0.1" title="Usable oxygen in each portable life-support system. NASA's ISS spacesuit carries about 0.5 kg in its primary tank."></div>
+          <div><label for="opt-o2" title="Oxygen the suit can use for breathing. Set it to your suit's value.">Suit oxygen (g)</label><input type="number" id="opt-o2" value="600" min="50" max="5000" step="50"></div>
+          <div><label for="opt-walkback" title="Walkback rule: from any point, the crew must be able to walk to safety and get inside on backup oxygen alone.">Backup O₂ (min)</label><input type="number" id="opt-walkback" value="60" min="5" max="240" step="5"></div>
         </div>
         <label class="switch-row"><input type="checkbox" id="opt-round" checked><span>Walk back to base at the end</span></label>
       </div>
@@ -147,7 +148,7 @@
           <ul>
             <li><span class="lvl ok">Checked against NASA</span><b>Terrain heights.</b> The CTX elevation model agrees with Perseverance's own localization at all 708 rover waypoints: mean difference 0.9 m, spread 3.4 m.</li>
             <li><span class="lvl ok">Checked against NASA</span><b>Mars clock.</b> Reproduces the sol numbers and sunrise times in NASA's Perseverance and Curiosity weather feeds.</li>
-            <li><span class="lvl ok">Checked against NASA</span><b>Route choice.</b> On 40 stretches of Perseverance's real drive (40.7 km), 80% of the planner's route lies within 100 m of the path JPL's rover drivers chose. Turn on "Planner vs Perseverance" in Layers to see it.</li>
+            <li><span class="lvl ok">Checked against NASA</span><b>Route choice.</b> On 40 stretches of Perseverance's real drive (40.7 km), 79% of the planner's route lies within 100 m of the path JPL's rover drivers chose. Turn on "Planner vs Perseverance" in Layers to see it.</li>
             <li><span class="lvl ok">Checked against NASA</span><b>Science targets.</b> Each sample site is the rover's surveyed position on the sol the sample was taken.</li>
             <li><span class="lvl model">Model</span><b>Time, energy and oxygen.</b> Apollo-derived walking and metabolic models (Marquez 2008; Santee et al. 2001), as in NASA / MIT SEXTANT. Planning estimates, never measured on Mars.</li>
             <li><span class="lvl model">Model</span><b>Weather.</b> A seasonal outlook from 4,745 sols of Curiosity data and Perseverance reports, not a forecast.</li>
@@ -155,6 +156,34 @@
             <li><span class="lvl no">Not visible</span><b>Rocks and ripples under 20 m.</b> The grid cannot see them. Check the last metres in the HiRISE layer and log what the crew finds as field reports.</li>
           </ul>
         </details>
+      </div>
+
+      <div class="block" id="alloc-block" hidden>
+        <div class="block-h">Traverse allocation · crew or machine?</div>
+        <div class="alloc" id="alloc"></div>
+      </div>
+
+      <div class="block" id="why-block" hidden>
+        <div class="block-h">Why this route?
+          <span class="block-actions"><button id="why-map" class="mini-btn" title="Draw the straight lines and the quickest path on the map">Show on map</button></span>
+        </div>
+        <div class="why-key" id="why-key" hidden>
+          <span><i class="ln st"></i>Straight line</span><span><i class="ln no"></i>Steeper than your limit</span>
+          <span><i class="ln sp"></i>Over 15°</span><span><i class="ln fa"></i>Quickest path in limit</span>
+        </div>
+        <details class="why-how">
+          <summary>How the planner picks a route</summary>
+          <ol>
+            <li>The ground is cut into 20 m squares from NASA's CTX elevation model of Jezero, and every square gets a slope.</li>
+            <li>Squares steeper than your slope limit are closed. The route's grid steps never land on one.</li>
+            <li>Every step is scored by the time it takes to walk it, using the Apollo walking model: slow uphill (a 5° climb cuts speed by more than half) and slow on steep downhill.</li>
+            <li>That time is multiplied by a slope penalty: ×1.6 on a 10° slope, ×2.4 at 15°, ×3.5 at 20° and ×4.9 at 25°.</li>
+            <li>An A* search finds the path with the lowest total score, moving in 16 directions from each square. So the route often walks farther to stay on gentle ground. Usually that is only a few percent, but in steep country it can add kilometres; the comparison below shows how much on each leg.</li>
+            <li>If a stop sits on ground that is too steep, the route ends at the nearest safe square within 8 squares in each direction (up to about 220 m).</li>
+          </ol>
+          <p>Below, each leg is compared with the straight line between its two points and with the quickest path your limit allows (the same search without the slope penalty).</p>
+        </details>
+        <div id="why-body"></div>
       </div>
 
       <div class="block" id="nearby-block" hidden>
@@ -335,7 +364,7 @@
         <div class="pf-hero">
           <div class="pf-main">
             <span class="pf-k">Route planning, tested against the real rover</span>
-            <div class="pf-big"><b id="pf-within">80%</b><span>of the planner's route length runs within 100 m of the path NASA's Perseverance drivers actually chose</span></div>
+            <div class="pf-big"><b id="pf-within">79%</b><span>of the planner's route length runs within 100 m of the path NASA's Perseverance drivers actually chose</span></div>
             <p class="pf-note" id="pf-method"></p>
             <button class="ifit-go" id="pf-show">See both paths on the map →</button>
           </div>
@@ -459,6 +488,7 @@
 <script src="js/conditions.js"></script>
 <script src="js/field.js"></script>
 <script src="js/planner.js"></script>
+<script src="js/explain.js"></script>
 <script src="js/briefing.js"></script>
 <script src="js/view3d.js"></script>
 <script src="js/globe.js"></script>

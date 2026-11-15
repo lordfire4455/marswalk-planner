@@ -34,6 +34,8 @@
     const end = plan.totalSeconds;
 
     const sci = plan.stopInfo.slice(1).map((s) => s.stop.targetId && MM.science.get(s.stop.targetId)).filter(Boolean);
+    let why = null;
+    try { why = MM.explain ? MM.explain.analyze(plan) : null; } catch (e) { console.error(e); }
     const html = `
     <div class="brief">
       <div class="brief-head">
@@ -48,19 +50,33 @@
         <div><span>Airlock closed</span><b>${when(end)} LMST</b></div>
         <div><span>EVA duration</span><b>${P.hm(end)}</b></div>
         <div><span>Suit limit / reserve</span><b>${S.limitH} h / ${P.hmShort(Math.max(0, S.limitH * 3600 - end))}</b></div>
-        <div><span>Distance</span><b>${P.km(plan.distance)}</b></div>
+        <div><span>Distance / farthest from base</span><b>${P.km(plan.distance)} / ${P.km(plan.farthest)}</b></div>
         <div><span>Climb / descent</span><b>${Math.round(plan.ascent)} m / ${Math.round(plan.descent)} m</b></div>
         <div><span>Steepest slope</span><b>${plan.maxSlope.toFixed(0)}° (limit ${S.maxSlope}°)</b></div>
         <div><span>Pace</span><b>${MM.eva.PACES[S.pace].label}, ${(plan.distance / Math.max(1, plan.walkSeconds) * 3.6).toFixed(1)} km/h avg</b></div>
         <div><span>Metabolic energy</span><b>${Math.round(plan.energyKcal)} kcal (${Math.round(plan.avgWatts)} W avg)</b></div>
         <div><span>Crew / route priority</span><b>${S.crew} astronaut${S.crew > 1 ? 's' : ''} / ${P.MODES[S.mode].label}</b></div>
-        <div><span>Oxygen per suit</span><b>${(plan.o2Grams / 1000).toFixed(2)} of ${S.o2Kg.toFixed(1)} kg</b></div>
+        <div><span>Oxygen used / in suit</span><b>${Math.round(plan.o2Grams)} g / ${S.o2G} g</b></div>
         <div><span>Radio line of sight</span><b>${Math.round(plan.losFraction * 100)}% of route</b></div>
-        <div><span>Farthest from base</span><b>${P.km(plan.farthest)}</b></div>
+        <div><span>Walkback + airlock / backup O₂</span><b>${Math.ceil(plan.walkbackSeconds / 60 + P.INGRESS_MIN)} min / ${S.walkbackMin} min</b></div>
       </div>
 
       <h3>Go / no-go</h3>
       <ul class="brief-checks">${plan.checks.map((c) => `<li class="${['go', 'caution', 'nogo'][c.level]}"><b>${c.title}.</b> ${esc(c.text)}</li>`).join('')}</ul>
+
+      ${plan.allocation ? (() => {
+        const a = plan.allocation, cls = (r) => ({ GO: 'go', CAUTION: 'caution', 'NO-GO': 'nogo' }[r.verdict]);
+        return `<h3>Traverse allocation: crew or machine</h3>
+      <div class="brief-alloc">
+        <div><span>Crew on foot</span><b class="${cls(a.human)}">${a.human.score}% · ${a.human.verdict}</b><small>${esc(a.human.limitingFactor)}</small></div>
+        <div><span>Mars machine (rover)</span><b class="${cls(a.machine)}">${a.machine.score}% · ${a.machine.verdict}</b><small>${esc(a.machine.limitingFactor)}${/sol/.test(a.machine.limitingFactor) ? '' : ' · about ' + a.machine.sols + ' sol' + (a.machine.sols > 1 ? 's' : '') + ' of driving'}</small></div>
+      </div>
+      <p class="brief-cap"><b>Recommendation:</b> ${esc(a.recommendation)}</p>`;
+      })() : ''}
+
+      ${why ? `<h3>Why this route</h3>
+      <p class="brief-cap">${esc(why.summary)}</p>
+      <ul class="brief-sci">${why.legs.map((l) => `<li><b>${esc(l.title)}.</b> ${esc(l.reasons.join(' '))}</li>`).join('')}</ul>` : ''}
 
       <h3>Timeline</h3>
       <table class="brief-tbl"><thead><tr><th>#</th><th>Location</th><th>Arrive (LMST)</th><th>Work</th><th>Leg</th><th>Walk</th><th>Terrain</th><th>Task</th></tr></thead><tbody>${rows}</tbody></table>
@@ -73,10 +89,10 @@
       <div class="brief-grid">
         <div><span>Sunrise / sunset</span><b>${T.hhmm(m.sunriseLMST)} / ${T.hhmm(m.sunsetLMST)} LMST</b></div>
         <div><span>Air temperature</span><b>${Math.round(C.tmin)}° to ${Math.round(C.tmax)}° C</b></div>
-        <div><span>Pressure</span><b>${C.bin.pressure ? Math.round(C.bin.pressure[1]) + ' Pa' : '–'}</b></div>
+        <div><span>${esc(C.plabel)}</span><b>${C.pressure != null ? Math.round(C.pressure) + ' Pa' : '–'}</b></div>
         <div><span>Dust-storm risk</span><b>${C.dust.label}</b></div>
       </div>
-      <div class="brief-cap">${esc(C.dust.note)} Temperature source: ${esc(C.tsrc)}.</div>
+      <div class="brief-cap">${esc(C.dust.note)} Temperature source: ${esc(C.tsrc)}. Pressure source: ${esc(C.psrc)}.</div>
 
       ${MM.site && MM.site.state() === 'ready' && plan.stops.length > 1 ? '<h3>Minerals at each stop (MRO CRISM)</h3><ul class="brief-sci">' + plan.stops.slice(1).map((s) => { const m = MM.site.minerals(s.lat, s.lon); return `<li><b>${esc(s.name)}</b>: ${esc(MM.site.short(m, 3))}.</li>`; }).join('') + '</ul>' : ''}
 
