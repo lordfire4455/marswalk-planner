@@ -82,7 +82,7 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 ## Measured impact and science at each stop
 
 - Every plan shows its own measured impact: the steep ground a straight-line walk would cross, the extra distance the safe route costs, science stops per EVA hour and the oxygen left per suit.
-- At every stop and science target the app reads the MRO CRISM browse products (Viviano-Beck et al. 2014) and reports a relative band strength for carbonate, Fe/Mg clay, hydrated minerals, olivine, pyroxene and chlorite, with what each mineral means for the search for life. This needs the online version, because browsers do not let a page read image pixels over `file://`.
+- At every stop and science target the app reads the MRO CRISM browse products (Viviano-Beck et al. 2014) and reports a relative band strength for carbonate, Fe/Mg clay, hydrated minerals, olivine, pyroxene and chlorite, with what each mineral means for the search for life. The images are baked into a 64 kB grid (`tools/build_minerals.py`), so this also works offline.
 
 ## Limits
 

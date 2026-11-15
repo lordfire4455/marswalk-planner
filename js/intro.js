@@ -263,7 +263,7 @@
         ['GO / NO-GO', 'from 10 checks a crew lead can read in five seconds, with the source of every number.'],
       ].map((r) => `<li><b>${r[0]}</b><span>${r[1]}</span></li>`).join('');
     }
-    if (MM.site) { MM.site.load(); MM.site.onReady(proofSites); if (MM.site.state() === 'unavailable') $('pf-sites').innerHTML = '<li class="pf-wait">Open the online version to read the CRISM mineral maps.</li>'; }
+    if (MM.site) { MM.site.load(); MM.site.onReady(proofSites); if (MM.site.state() === 'unavailable') $('pf-sites').innerHTML = '<li class="pf-wait">Mineral data cannot be read in this browser.</li>'; }
   }
   /** Three science targets with the strongest, different mineral signals. */
   function proofSites() {

@@ -94,7 +94,7 @@
           <li><b>Reproduce it.</b> <code>node tools/validate_routes.js</code> rebuilds <code>data/validation.js</code> from the bundled data.</li>
         </ul>`; })() : ''}
         <h3>Minerals at a point</h3>
-        <p>Each CRISM browse image stores three spectral band indices as its red, green and blue channels (Viviano-Beck et al. 2014): MAF for olivine and pyroxene, CAR for clay, carbonate and hydration, PFM for chlorite and Fe/Mg clays. The planner averages a 5 × 5 pixel window (about 90 m) at each stop and reports a relative strength: weak, moderate or strong. It shows where a mineral is likely, not how much is there.</p>
+        <p>Each CRISM browse image stores three spectral band indices as its red, green and blue channels (Viviano-Beck et al. 2014): MAF for olivine and pyroxene, CAR for clay, carbonate and hydration, PFM for chlorite and Fe/Mg clays. We average the pixels in each 100 m cell (tools/build_minerals.py) and the planner reports a relative strength at each stop: weak, moderate or strong. It shows where a mineral is likely, not how much is there.</p>
         <h3>Limits you should know</h3>
         <ul>
           <li>A 20 m grid cannot see individual rocks or sand ripples. Use the HiRISE layer to check the last metres by eye.</li>
