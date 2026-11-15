@@ -2,7 +2,8 @@
  * Safe-route finder: A* over the 20 m DEM grid.
  *
  * Edge cost = walking time (Apollo-derived speed for the grade actually walked)
- *             x a hazard factor that grows with the terrain slope of the cells.
+ *             x a hazard factor that grows with the terrain slope of the cells
+ *             (the same factor at every slope limit).
  * Cells steeper than the chosen limit are impassable.
  * 16-direction moves keep paths close to the true shortest line.
  */
@@ -10,6 +11,12 @@
   'use strict';
   const MM = (window.MM = window.MM || {});
   const D2R = Math.PI / 180;
+  // Slope at which the hazard factor reaches 3.5. Fixed, so a 12° slope costs the same
+  // whatever limit the crew picks: raising the limit opens steeper ground without making
+  // the ground the route already used look any easier.
+  const HAZARD_REF_DEG = 20, HAZARD_WEIGHT = 2.5;
+  /** Slope penalty that multiplies the walking time of a step: 1 on flat ground, 3.5 at 20°. */
+  const hazardFactor = (s) => 1 + HAZARD_WEIGHT * (s / HAZARD_REF_DEG) * (s / HAZARD_REF_DEG);
 
   let g = null, from = null, stamp = null, closed = null, queryId = 0;
   let heapIdx = null, heapKey = null, heapN = 0;
@@ -100,7 +107,9 @@
       const ex = (c - gc) * dx, ey = (r - gr) * dy;
       return Math.sqrt(ex * ex + ey * ey) / vmax;
     };
-    const hazard = (s) => { const q = s / maxSlope; return 1 + 2.5 * q * q; };
+    // opts.hazardWeight 0 gives the plain quickest path within the limit (used by "Why this route?").
+    const hw = opts.hazardWeight != null ? opts.hazardWeight : HAZARD_WEIGHT;
+    const hazard = (s) => { const q = s / HAZARD_REF_DEG; return 1 + hw * q * q; };
 
     queryId++; heapN = 0;
     g[start] = 0; from[start] = -1; stamp[start] = queryId;
@@ -145,5 +154,5 @@
     return { ok: true, line, expanded, ms: performance.now() - t0, snappedStart: T.cellOf(a[0], a[1]) !== start, snappedGoal: T.cellOf(b[0], b[1]) !== goal };
   }
 
-  MM.router = { route, snap };
+  MM.router = { route, snap, hazardFactor, HAZARD_REF_DEG, HAZARD_WEIGHT, SNAP_CELLS: 8 };
 })();

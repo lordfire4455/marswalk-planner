@@ -75,17 +75,20 @@
         <h3>How the planner works</h3>
         <ul>
           <li><b>Slope.</b> Horn's method on the 20 m elevation grid, corrected for the map projection.</li>
-          <li><b>Safest route.</b> A* search over 2.4 million cells with 16 directions of movement. The cost of each step is walking time multiplied by a hazard factor that grows with slope. Cells steeper than your limit are impassable.</li>
+          <li><b>Safest route.</b> A* search over 2.4 million cells with 16 directions of movement. The cost of each step is walking time multiplied by a hazard factor that grows with slope, the same at every limit. Cells steeper than your limit are impassable. The <i>Why this route?</i> panel compares every leg with the straight line and with the quickest path the limit allows.</li>
           <li><b>Walking speed.</b> Function of slope fitted to Apollo 14 traverse data (Marquez 2008), the model inside the NASA / MIT SEXTANT planner, scaled by your chosen pace.</li>
-          <li><b>Energy and oxygen.</b> Santee et al. (2001) load-carriage model at Mars gravity (3.71 m/s²) for a 150 kg suited astronaut; oxygen from 4.85 kcal per litre of O₂.</li>
+          <li><b>Energy and oxygen.</b> Santee et al. (2001) load-carriage model at Mars gravity (3.71 m/s²) for a 150 kg suited astronaut; oxygen from 4.85 kcal per litre of O₂. This is breathing oxygen only (no suit leaks), checked against the suit oxygen you enter. Science stops and airlock time count as light work (150 W); hard work at a stop can cost twice that, so read the oxygen figure as a low estimate. The 600 g default is a placeholder, not the spec of a real suit.</li>
+          <li><b>Walkback.</b> The Apollo rule: never go farther than you can walk back on backup oxygen. For every point of the route the planner times the walk to safety, either retracing the route or carrying on to its end, adds the 15 min airlock time, and compares the worst case with the backup supply you enter (60 min by default, a placeholder).</li>
           <li><b>Radio cover.</b> Line of sight from each step to a 10 m mast at base over the elevation model, including the curvature of Mars.</li>
           <li><b>Mars time and Sun.</b> Allison &amp; McEwen (2000), the algorithm behind NASA's Mars24. It reproduces the sol numbers and sunrise times in the mission weather feeds.</li>
           <li><b>Dust risk.</b> Seasonal storm windows by solar longitude (Kass et al. 2016).</li>
+          <li><b>Weather at Jezero.</b> Perseverance MEDA readings when they come from the same part of the Mars year. Otherwise Curiosity's Gale Crater norms stand in. Gale is at 4.6° S and much lower than Jezero, so its pressure is scaled to Jezero by the ratio of MEDA's readings to the Gale median for the same season (an estimate, good to a few percent).</li>
         </ul>
         <h3>Limits you should know</h3>
         <ul>
           <li>A 20 m grid cannot see individual rocks or sand ripples. Use the HiRISE layer to check the last metres by eye.</li>
-          <li>Weather is a seasonal outlook, not a forecast. The public MEDA feed is not updated every sol.</li>
+          <li>Weather is a seasonal outlook, not a forecast. The public MEDA feed holds only one week of reports, the latest from sol ${W.meda.latest.length ? W.meda.latest[W.meda.latest.length - 1].sol + ' (' + W.meda.latest[W.meda.latest.length - 1].terrestrial_date + ')' : '–'}, so most dates use Curiosity's Gale norms, which are only a stand-in for Jezero.</li>
+          <li>The walkback time follows the planned route, so a real shortcut back could be quicker. It is an upper bound on the walking time, not an exact time, and a slower walk back (an injured crew member) would take longer.</li>
           <li>Speed and energy models come from Apollo lunar data and are planning estimates.</li>
         </ul>
         <p class="note">Built for the NASA Space Apps Challenge. NASA does not endorse this project. Map library: Leaflet (BSD-2).</p>
@@ -102,6 +105,7 @@
       MM.science.init();
       MM.conditions.init();
       MM.planner.init();
+      if (MM.explain) MM.explain.init();
 
       $('presets').innerHTML = PRESETS.map((p) => `<button class="preset" data-preset="${p.id}"><span class="preset-ico">${p.icon}</span><span><b>${p.title}</b><small>${p.sub}</small></span></button>`).join('');
       $('presets').addEventListener('click', (e) => { const b = e.target.closest('[data-preset]'); if (b) runPreset(b.dataset.preset); });

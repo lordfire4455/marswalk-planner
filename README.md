@@ -31,12 +31,14 @@ then open http://localhost:8000.
 |---|---|
 | **Slope hazard map** | Every 20 m cell coloured from easy (under 5°) to no-go, computed from the MRO CTX stereo elevation model. |
 | **Safest-route finder** | A* search over 2.4 million terrain cells. Avoids slopes above your limit and prefers gentle ground. Usually answers in under half a second. |
-| **Go / no-go checks** | Suit time and reserve, terrain, daylight, temperature, dust-storm season, radio line of sight to base, one-way pickup. |
-| **EVA numbers** | Distance, walking time, climb, metabolic energy, oxygen used, farthest point from base. |
+| **Go / no-go checks** | Suit time and reserve, walkback on backup oxygen, suit oxygen, terrain, daylight, temperature, dust-storm season, radio line of sight to base, steep base or stops, one-way pickup. |
+| **EVA numbers** | Distance, walking time, climb, metabolic energy, oxygen used, longest walkback, farthest point from base. |
 | **Elevation profile** | Coloured by slope class, with a radio line-of-sight strip. Hover to find any point on the map. |
 | **Mission overview** | An entrance screen that explains the project, shows live Jezero time, maps each challenge requirement to a feature, and jumps into any of the four views. |
-| **3D preview** | The route draped over a solid block of real terrain, with a fly-through. |
+| **Crew or machine?** | The same route scored 0–100 for a suited crew on foot and for an autonomous six-wheeled machine, each with a GO / CAUTION / NO-GO verdict, the limiting factor and a one-line recommendation (also in the briefing). |
+| **3D preview** | The route draped over a solid block of real terrain, with a fly-through in which a suited astronaut (drawn larger than life so it stays visible) walks the route, leans into climbs and waves on arrival. An Astronaut / Machine switch swaps in a procedural rocker-bogie rover (turning wheels, scanning mast, arm that unstows on arrival); it starts on whichever option scored higher. |
 | **Science targets** | 19 Perseverance sites (17 sample sites, the Three Forks sample depot and the landing site) plus two Ingenuity sites, all at their real surveyed positions. |
+| **Why this route?** | For every leg: what the straight line runs into, how far the route bends to avoid it, and what it gave up against the quickest path the slope limit allows. Can be drawn on the map and is printed in the briefing. |
 | **Science along the way** | Suggests targets within 600 m of your route and inserts them in the right order. |
 | **Mineral maps** | CRISM olivine / pyroxene, carbonate and clay maps from orbit. |
 | **Mars clock and weather** | Live Jezero local time, sol, season, sunrise and sunset; Perseverance MEDA reports; seasonal norms from 4,745 sols of Curiosity REMS data. |
@@ -57,10 +59,12 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 ## How it works
 
 - `js/terrain.js`: unpacks the elevation model, computes slope (Horn's method) and shaded relief, samples elevation, checks line of sight including the curvature of Mars.
-- `js/router.js`: A* route search with 16 directions of movement. Step cost is walking time multiplied by a slope hazard factor.
+- `js/router.js`: A* route search with 16 directions of movement. Step cost is walking time multiplied by a slope hazard factor, the same factor at every slope limit.
 - `js/eva.js`: walking speed as a function of slope from Apollo 14 traverse data (Marquez 2008) and metabolic cost from Santee et al. (2001) at Mars gravity. These are the models used by the NASA / MIT SEXTANT traverse planner.
+- `js/planner.js` also applies the Apollo walkback rule: from every point of the route, the walk to safety (retracing the route or carrying on to its end) plus the 15 min airlock time must fit inside the backup oxygen time.
 - `js/mars-time.js`: Mars Sol Date, local solar time, solar longitude, sunrise and sunset (Allison & McEwen 2000, the algorithm behind NASA's Mars24).
 - `js/conditions.js`, `js/planner.js`, `js/science.js`, `js/layers.js`, `js/briefing.js`, `js/view3d.js`: weather, planning, targets, map layers, briefing, 3D.
+- `js/explain.js`: the *Why this route?* panel. It re-walks the straight line and runs the router once more with the slope penalty off (`hazardWeight: 0`) to compare against.
 - `js/intro.js`: the mission overview (entrance screen). `js/app.js`: start-up, tabs, ready-made missions and the Data & methods window.
 - `tools/build_data.py`: rebuilds everything in `data/` from the raw NASA files.
 
@@ -73,7 +77,10 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 ## Limits
 
 - A 20 m grid cannot see individual rocks or sand ripples. Use the HiRISE layer to check the last metres by eye.
-- Weather is a seasonal outlook, not a forecast.
+- Weather is a seasonal outlook, not a forecast. Outside the MEDA season the norms come from Curiosity at Gale Crater (4.6° S, much lower than Jezero), so pressure is scaled to Jezero with MEDA's own readings.
+- The suit oxygen (600 g) and backup oxygen (60 min) defaults are planning placeholders, not real suit specs. Set them to your suit. Science stops count as light work (150 W), so the oxygen figure is a low estimate.
+- The crew-or-machine scores are a planning heuristic. Crew: walkback, darkness, suit oxygen, suit time, an 8.5 km foot radius and slopes over 22° are hard limits; effort, steep ground, cold and thin margins take points off. Machine (`MM.eva.PROFILES.machine`): ground over 20° is a hard limit, over 14° caps the score below 40, slopes over 12° halve progress (wheel slip), and sharp crests, the sand ripples near Séítah and Observation Mountain, and the number of sols (about 180 m per sol) take points off. The 20 m elevation model cannot see rocks or ripples smaller than a pixel.
+- Walkback time follows the planned route, so it is an upper bound on the walking time: a real shortcut could be quicker.
 - Speed and energy models come from Apollo lunar data and are planning estimates, not flight rules.
 
 ## Working on it as a team

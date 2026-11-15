@@ -8,7 +8,10 @@
   const EGRESS_MIN = 15, INGRESS_MIN = 15, RESERVE_MIN = 30;
   const KCAL_PER_L_O2 = 4.85, O2_G_PER_L = 1.429;
 
-  const S = { stops: [], maxSlope: 20, pace: 'nominal', startH: 9, limitH: 8, roundTrip: true };
+  // Defaults for the two consumable rules. They are planning settings, not the spec of a real suit.
+  const WALKBACK_MIN = 60, O2_G = 600, O2_THIN = 0.85, WALKBACK_THIN = 0.85;
+
+  const S = { stops: [], maxSlope: 20, pace: 'nominal', startH: 9, limitH: 8, roundTrip: true, walkbackMin: WALKBACK_MIN, o2G: O2_G };
   let plan = null, legCache = new Map(), layer = null, hoverMarker = null, computeToken = 0;
   const $ = (id) => document.getElementById(id);
   const hm = (sec) => { const m = Math.round(sec / 60); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min'; };
@@ -74,7 +77,7 @@
     const seq = S.stops.slice();
     if (S.roundTrip) seq.push(Object.assign({}, base, { isReturn: true, stopMin: 0, name: 'Back at base' }));
     const legs = [];
-    const m = { d: [], z: [], slope: [], cls: [], los: [], lat: [], lon: [], clock: [], leg: [] };
+    const m = { d: [], z: [], slope: [], cls: [], los: [], lat: [], lon: [], clock: [], walk: [], leg: [] };
     let dist = 0, clock = EGRESS_MIN * 60, walk = 0, energy = 0, up = 0, down = 0, maxSlope = 0, sci = 0;
     const classDist = new Array(MM.terrain.CLASSES.length).fill(0);
     const stopInfo = [{ stop: base, d: 0, arrive: 0, depart: clock, idx: 0 }];
@@ -92,7 +95,7 @@
       const sm = an.samples;
       for (let k = (m.d.length ? 1 : 0); k < sm.d.length; k++) {
         m.d.push(dist + sm.d[k]); m.z.push(sm.z[k]); m.slope.push(sm.slope[k]); m.cls.push(sm.cls[k]); m.los.push(sm.los[k]);
-        m.lat.push(sm.lat[k]); m.lon.push(sm.lon[k]); m.clock.push(clock + sm.t[k]); m.leg.push(i);
+        m.lat.push(sm.lat[k]); m.lon.push(sm.lon[k]); m.clock.push(clock + sm.t[k]); m.walk.push(walk + sm.t[k]); m.leg.push(i);
       }
       dist += an.distance; clock += an.walkSeconds; walk += an.walkSeconds; energy += an.energyJ;
       up += an.ascent; down += an.descent; maxSlope = Math.max(maxSlope, an.maxSlope);
@@ -100,7 +103,8 @@
       const arrive = clock;
       const stay = (b.stopMin || 0) * 60;
       clock += stay; sci += stay; energy += stay * MM.eva.REST_POWER;
-      legs.push({ ok: true, from: a, to: b, line: r.line, an, snapped: r.snappedGoal });
+      // a / b freeze the end points this leg was routed between (stop objects change when a pin is dragged).
+      legs.push({ ok: true, from: a, to: b, a: [a.lat, a.lon], b: [b.lat, b.lon], line: r.line, an, snapped: r.snappedGoal, snappedStart: r.snappedStart });
       stopInfo.push({ stop: b, d: dist, arrive, depart: clock, idx: m.d.length - 1 });
     }
     const overhead = (EGRESS_MIN + INGRESS_MIN) * 60;
@@ -113,22 +117,47 @@
       if (r > far) { far = r; farIdx = k; }
     }
     const kcal = energy / 4184;
+    const wb = ok ? walkback(m, walk) : null;
     const p = {
-      ok, fail, legs, m, stopInfo, base, roundTrip: S.roundTrip,
+      ok, fail, legs, m, stopInfo, base, roundTrip: S.roundTrip, slopeLimit: S.maxSlope, pace: S.pace,   // the rules this plan was routed with
       distance: dist, walkSeconds: walk, scienceSeconds: sci, overheadSeconds: overhead, totalSeconds: total,
       ascent: up, descent: down, maxSlope, classDist, energyKcal: kcal, avgWatts: total ? energy / total : 0,
       o2Grams: kcal / KCAL_PER_L_O2 * O2_G_PER_L, losFraction: m.d.length ? losOk / m.d.length : 1,
       farthest: far, farthestClock: m.clock[farIdx] || 0,
+      walkbackSeconds: wb ? wb.worst : 0, walkbackIdx: wb ? wb.idx : 0,
     };
     p.checks = evaluate(p);
     p.verdict = p.checks.reduce((w, c) => Math.max(w, c.level), 0);
     return p;
   }
 
+  /**
+   * Walkback rule, as on Apollo: if the suit fails at any point of the route, the crew drops
+   * the science and walks to safety on backup oxygen. Two ways are always open: retrace the
+   * route back to base, or carry on along it to its end (base on a round trip, the rover
+   * pickup on a one-way walk). A shortcut could only be quicker, so this is an upper bound.
+   * Returns the longest such walk in seconds and the sample index where it happens.
+   */
+  function walkback(m, walkTotal) {
+    const n = m.d.length, pf = MM.eva.PACES[S.pace].factor, D2R = Math.PI / 180;
+    let back = 0, worst = 0, idx = 0;
+    for (let k = 0; k < n; k++) {
+      if (k > 0) {
+        // Retracing the step from k to k - 1, so the grade is reversed.
+        const seg = m.d[k] - m.d[k - 1], dz = m.z[k - 1] - m.z[k];
+        if (seg > 0.01) back += Math.sqrt(seg * seg + dz * dz) / MM.eva.speed(Math.atan2(dz, seg) / D2R, pf);
+      }
+      const t = Math.min(back, Math.max(0, walkTotal - m.walk[k]));
+      if (t > worst) { worst = t; idx = k; }
+    }
+    return { worst, idx };
+  }
+
   // ------------------------------------------------------------------ go / no-go
   function evaluate(p) {
     const C = MM.conditions.current(), m = C.mars, out = [];
     const add = (level, title, text) => out.push({ level, title, text });
+    p.allocation = null;
     if (!p.ok) {
       const why = { 'no-path': 'every way through is steeper than ' + S.maxSlope + '°', 'start-steep': 'the start point sits on ground steeper than ' + S.maxSlope + '°',
         'goal-steep': 'the destination sits on ground steeper than ' + S.maxSlope + '°', outside: 'a point is outside the elevation model' }[p.fail.reason] || 'no route was found';
@@ -139,6 +168,23 @@
     if (p.totalSeconds > limit) add(2, 'Over the suit limit', 'This EVA needs ' + hm(p.totalSeconds) + ' but the suit supports ' + S.limitH + ' h. Drop a stop or walk less.');
     else if (p.totalSeconds > limit - reserve) add(1, 'Inside the reserve', hm(p.totalSeconds) + ' leaves less than the ' + RESERVE_MIN + ' min safety reserve on an ' + S.limitH + ' h suit.');
     else add(0, 'Time', hm(p.totalSeconds) + ' of ' + S.limitH + ' h, with ' + hmShort(limit - p.totalSeconds) + ' in reserve.');
+
+    // Backup oxygen has to cover the walk to safety and getting inside (the same airlock time the plan budgets).
+    const need = p.walkbackSeconds + INGRESS_MIN * 60, needMin = Math.ceil(need / 60), walkMin = Math.ceil(p.walkbackSeconds / 60);
+    const backup = S.walkbackMin * 60, safety = p.roundTrip ? 'base' : 'base or the pickup point';
+    const wk = p.walkbackIdx, atStop = p.stopInfo.find((si, i) => i > 0 && si.arrive != null && si.idx === wk && !si.stop.isReturn);
+    const where = km(p.m.d[wk]) + ' into the walk (' + (atStop ? 'at ' + atStop.stop.name : 'on the way to ' + p.legs[p.m.leg[wk]].to.name) + ')';
+    const split = walkMin + ' min walking + ' + INGRESS_MIN + ' min airlock';
+    if (need > backup) add(1, 'Beyond walkback', 'If a suit fails ' + where + ', getting back to ' + safety + ' and inside takes about ' + needMin + ' min (' + split +
+      '), but the backup oxygen lasts ' + S.walkbackMin + ' min. Only go with a rover standing by to fetch the crew.');
+    else if (need > backup * WALKBACK_THIN) add(1, 'Thin walkback margin', 'From the worst point, ' + where + ', getting back to ' + safety + ' and inside takes about ' + needMin +
+      ' of the ' + S.walkbackMin + ' min backup oxygen (' + split + '). Little is left if the walk back goes slower.');
+    else add(0, 'Walkback', 'From every point of the route the crew can get back to ' + safety + ' and inside in ' + needMin + ' min or less (' + split + '), inside the ' + S.walkbackMin + ' min backup oxygen.');
+
+    const o2 = Math.round(p.o2Grams), o2Pct = Math.round(p.o2Grams / S.o2G * 100);
+    if (p.o2Grams > S.o2G) add(2, 'Not enough oxygen', 'This EVA burns about ' + Math.ceil(p.o2Grams) + ' g of oxygen but the suit holds ' + S.o2G + ' g. Shorten the walk or the stops.');
+    else if (p.o2Grams > S.o2G * O2_THIN) add(1, 'Thin oxygen margin', 'About ' + o2 + ' g of the suit\'s ' + S.o2G + ' g (' + o2Pct + '%), leaving less than ' + Math.round((1 - O2_THIN) * 100) + '% spare for hard work or a leak.');
+    else add(0, 'Oxygen', 'About ' + o2 + ' g of the suit\'s ' + S.o2G + ' g (' + o2Pct + '%) for breathing.');
 
     const steep = p.classDist.slice(2).reduce((a, b) => a + b, 0), hard = p.classDist.slice(3).reduce((a, b) => a + b, 0);
     const pct = (v) => Math.round(v / Math.max(1, p.distance) * 100);
@@ -166,6 +212,7 @@
     else if (los < 90) add(1, 'Partial radio cover', los + '% of the route has line of sight to base. Expect dropouts in the red sections of the profile.');
     else add(0, 'Radio', los + '% of the route has line of sight to base.');
 
+    if (p.legs[0] && p.legs[0].ok && p.legs[0].snappedStart) add(1, 'Steep base', p.base.name + ' sits on ground steeper than ' + S.maxSlope + '°. The route leaves from the nearest safe spot beside it.');
     const moved = p.legs.filter((l) => l.ok && l.snapped && !l.to.isReturn).map((l) => l.to.name);
     if (moved.length) add(1, 'Steep destination', moved.join(', ') + (moved.length > 1 ? ' sit' : ' sits') + ' on ground steeper than ' + S.maxSlope + '°. The route stops at the nearest safe spot beside it.');
 
@@ -174,11 +221,20 @@
       const gap = MM.terrain.dist(p.base.lat, p.base.lon, last.lat, last.lon);
       if (gap > 200) add(1, 'One-way walk', 'The EVA ends ' + km(gap) + ' from base. A rover pickup must be waiting at ' + last.name + '.');
     }
+
+    // Crew on foot or the machine? Scored on the same route and the same settings.
+    try {
+      p.allocation = MM.eva.evaluateTraverse(p, MM.terrain, C, { startH: S.startH, limitH: S.limitH, o2G: S.o2G, walkbackMin: S.walkbackMin, ingressMin: INGRESS_MIN, reserveMin: RESERVE_MIN });
+    } catch (e) { console.error(e); p.allocation = null; }
     return out;
   }
 
   // ------------------------------------------------------------------ rendering
-  function renderAll() { if (MM.view3d && MM.view3d.isOpen()) MM.view3d.close(); renderMap(); renderStops(); renderSummary(); renderProfile(); renderNearby(); saveHash(); }
+  function renderAll() {
+    if (MM.view3d && MM.view3d.isOpen()) MM.view3d.close();
+    renderMap(); renderStops(); renderSummary(); renderProfile(); renderNearby(); saveHash();
+    if (MM.explain) MM.explain.update(plan);
+  }
 
   function renderMap() {
     const map = MM.map, T = MM.terrain;
@@ -260,9 +316,9 @@
         ['Climb', '↑' + Math.round(plan.ascent) + ' m', '↓' + Math.round(plan.descent) + ' m'],
         ['Steepest', plan.maxSlope.toFixed(0) + '°', 'limit ' + S.maxSlope + '°'],
         ['Energy', Math.round(plan.energyKcal) + ' kcal', Math.round(plan.avgWatts) + ' W average'],
-        ['Oxygen', Math.round(plan.o2Grams) + ' g', 'metabolic use'],
+        ['Oxygen', Math.round(plan.o2Grams) + ' g', 'of ' + S.o2G + ' g in the suit'],
         ['Radio contact', Math.round(plan.losFraction * 100) + '%', 'line of sight to base'],
-        ['Farthest point', km(plan.farthest), 'from base'],
+        ['Walkback', Math.ceil(plan.walkbackSeconds / 60 + INGRESS_MIN) + ' min', 'of ' + S.walkbackMin + ' min backup O₂'],
       ];
       $('stats').innerHTML = st.map((r) => `<div class="stat"><span>${r[0]}</span><b>${r[1]}</b><small>${r[2]}</small></div>`).join('');
       const T = MM.terrain;
@@ -271,6 +327,30 @@
     } else { $('stats').innerHTML = ''; $('classbar').innerHTML = ''; $('classbar-legend').innerHTML = ''; }
     $('checks').innerHTML = plan.checks.map((c) => `<li class="${['go', 'caution', 'nogo'][c.level]}"><b>${c.title}</b><span>${esc(c.text)}</span></li>`).join('');
     document.querySelectorAll('#btn-brief,#btn-3d,#btn-share,#btn-export').forEach((b) => { b.disabled = !plan.ok; });
+    renderAllocation();
+  }
+
+  // Traverse allocation card: the same route scored for a crew on foot and for the machine.
+  const ICON = {
+    human: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="2.6" r="1.9"/><path d="M8 5.2c-1.4 0-2.3.8-2.6 2L4.6 10h1.8l.5-1.8.2 2.6L6 15h1.9l1-3.6 1 3.6H12l-1.2-4.2.2-2.6.5 1.8h1.8l-.8-2.8c-.3-1.2-1.2-2-2.6-2z"/></svg>',
+    machine: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="5.5" width="9" height="3.5" rx=".8"/><rect x="10.2" y="1.5" width="1.2" height="4"/><rect x="9.2" y="1" width="3.2" height="1.6" rx=".4"/><path d="M4 9h1v1.6l2.5 1 2.5-1V9h1v2.2l-3.5 1.4L4 11.2z"/><circle cx="3.2" cy="13" r="1.8"/><circle cx="7.6" cy="13" r="1.8"/><circle cx="12.2" cy="13" r="1.8"/></svg>',
+  };
+  function allocRow(kind, label, r) {
+    const cls = { GO: 'go', CAUTION: 'caution', 'NO-GO': 'nogo' }[r.verdict];
+    return `<div class="alloc-row ${cls}">
+      <div class="alloc-top"><span class="alloc-ico">${ICON[kind]}</span><span class="alloc-name">${label}</span><b>${r.score}% · ${r.verdict}</b></div>
+      <div class="alloc-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${r.score}" aria-label="${label} suitability"><i style="width:${Math.max(r.score, 1.5)}%"></i></div>
+      <small>${esc(r.limitingFactor)}</small>
+    </div>`;
+  }
+  function renderAllocation() {
+    const blk = $('alloc-block'), a = plan && plan.ok ? plan.allocation : null;
+    blk.hidden = !a;
+    if (!a) return;
+    const P = MM.eva.PROFILES.machine;
+    $('alloc').innerHTML = allocRow('human', 'Crew on foot', a.human) + allocRow('machine', 'Mars machine', a.machine) +
+      `<p class="alloc-brief"><b>Tactical briefing.</b> ${esc(a.recommendation)}</p>
+      <small class="alloc-foot">Same route for both. Machine: ${P.maxSlopeDeg}° traction limit, ${P.critSlopeDeg}° rollover limit, about ${P.solBudgetM} m per sol, half speed above ${P.slipFromDeg}° from wheel slip. Planning estimate, not a flight rule.</small>`;
   }
 
   function renderNearby() {
@@ -372,10 +452,13 @@
   // ------------------------------------------------------------------ persistence
   function serialize() {
     return { v: 1, s: S.stops.map((s) => [Number(s.lat.toFixed(6)), Number(s.lon.toFixed(6)), s.targetId || (s.custom ? s.name : ''), s.stopMin, s.custom ? 1 : 0]),
-      ms: S.maxSlope, p: S.pace, st: S.startH, lim: S.limitH, rt: S.roundTrip ? 1 : 0 };
+      ms: S.maxSlope, p: S.pace, st: S.startH, lim: S.limitH, rt: S.roundTrip ? 1 : 0, wb: S.walkbackMin, o2: S.o2G };
   }
   function load(o, opts) {
     S.maxSlope = o.ms || 20; S.pace = o.p || 'nominal'; S.startH = o.st != null ? o.st : 9; S.limitH = o.lim || 8; S.roundTrip = !!o.rt;
+    // Older links have neither; hand-edited ones are held to the same ranges as the inputs.
+    const inRange = (v, lo, hi, dflt) => { v = Number(v); return v >= lo && v <= hi ? v : dflt; };
+    S.walkbackMin = inRange(o.wb, 5, 240, WALKBACK_MIN); S.o2G = inRange(o.o2, 50, 5000, O2_G);
     S.stops = (o.s || []).map((a) => {
       const t = a[2] && !a[4] ? MM.science.get(a[2]) : null;
       return { lat: a[0], lon: a[1], targetId: t ? t.id : null, name: t ? t.name : (a[4] ? a[2] : ''), custom: !!a[4], stopMin: a[3] || 0 };
@@ -422,6 +505,7 @@
     document.querySelectorAll('#opt-slope button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === S.maxSlope));
     document.querySelectorAll('#opt-pace button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.pace));
     $('opt-start').value = MM.time.hhmm(S.startH); $('opt-limit').value = S.limitH; $('opt-round').checked = S.roundTrip;
+    $('opt-walkback').value = S.walkbackMin; $('opt-o2').value = S.o2G;
   }
 
   function init() {
@@ -444,6 +528,8 @@
     $('opt-start').addEventListener('change', (e) => { const p = e.target.value.split(':'); if (p.length === 2) { S.startH = Number(p[0]) + Number(p[1]) / 60; refresh(); } });
     $('opt-limit').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v >= 1 && v <= 12) { S.limitH = v; refresh(); } });
     $('opt-round').addEventListener('change', (e) => { S.roundTrip = e.target.checked; compute(); });
+    $('opt-walkback').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v >= 5 && v <= 240) { S.walkbackMin = v; refresh(); } else syncControls(); });
+    $('opt-o2').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v >= 50 && v <= 5000) { S.o2G = v; refresh(); } else syncControls(); });
     $('stops').addEventListener('click', (e) => {
       const li = e.target.closest('.stop'); if (!li) return;
       const i = Number(li.dataset.i), b = e.target.closest('button');
@@ -478,6 +564,6 @@
 
   MM.planner = {
     init, addPoint, addTarget, clear, load, loadHash, refresh, fit, serialize, drawProfile,
-    settings: () => S, plan: () => plan, EGRESS_MIN, INGRESS_MIN, RESERVE_MIN, hm, hmShort, km,
+    settings: () => S, plan: () => plan, EGRESS_MIN, INGRESS_MIN, RESERVE_MIN, WALKBACK_MIN, O2_G, hm, hmShort, km,
   };
 })();

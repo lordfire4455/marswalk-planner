@@ -21,13 +21,41 @@
     return W.climatology[Math.floor(MM.time.mod(ls, 360) / W.bin_deg) % W.climatology.length];
   }
 
+  /** Angular gap between two solar longitudes, 0 to 180 degrees. */
+  const lsGap = (a, b) => Math.abs(MM.time.mod(a - b + 180, 360) - 180);
+
   /** Best MEDA sol to use for a given Ls: only if it was measured in the same part of the year. */
   function medaFor(ls) {
-    const rows = window.MM_WEATHER.meda.latest.filter((r) => num(r.min_temp) != null && num(r.max_temp) != null);
+    const rows = window.MM_WEATHER.meda.latest.filter((r) => num(r.min_temp) != null && num(r.max_temp) != null && num(r.ls) != null);
     if (!rows.length) return null;
     const r = rows[rows.length - 1];
-    const d = Math.abs(MM.time.mod(num(r.ls) - ls + 180, 360) - 180);
-    return d <= 20 ? r : null;
+    return lsGap(num(r.ls), ls) <= 20 ? r : null;
+  }
+
+  /**
+   * Surface pressure at Jezero for a given Ls.
+   * Curiosity works far below Jezero's floor, so Gale pressure reads higher than Jezero's.
+   * 1. A MEDA reading within a few degrees of Ls is used as it is. Pressure swings by about
+   *    25% through the year, so one sol cannot stand for a wider window.
+   * 2. Otherwise the Gale seasonal median is scaled by the ratio of the MEDA readings to the
+   *    Gale median at their own Ls (the seasonal CO2 cycle is planet-wide, so its shape carries over).
+   * 3. With no MEDA pressure at all, the Gale value is shown and labelled as uncorrected.
+   * kind: 'meda' (measured), 'scaled' (estimate) or 'gale' (uncorrected).
+   */
+  function pressureFor(ls, bin) {
+    const rows = window.MM_WEATHER.meda.latest.filter((r) => num(r.pressure) != null && num(r.ls) != null);
+    let near = null;
+    for (const r of rows) if (lsGap(num(r.ls), ls) <= 5 && (!near || lsGap(num(r.ls), ls) < lsGap(num(near.ls), ls))) near = r;
+    if (near) return { pa: num(near.pressure), kind: 'meda', src: 'Perseverance MEDA, sol ' + near.sol };
+    if (!bin.pressure) return { pa: null, kind: 'gale', src: 'no data' };
+    const used = rows.filter((r) => climBin(num(r.ls)).pressure);
+    if (used.length) {
+      const k = used.reduce((a, r) => a + num(r.pressure) / climBin(num(r.ls)).pressure[1], 0) / used.length;
+      const lss = used.map((r) => num(r.ls)), lo = Math.floor(Math.min(...lss)), hi = Math.ceil(Math.max(...lss));
+      return { pa: bin.pressure[1] * k, kind: 'scaled', src: 'Curiosity REMS seasonal median × ' + k.toFixed(2) + ' (MEDA ÷ REMS median at Ls ' + (lo === hi ? lo : lo + '–' + hi) + '°, ' +
+        used.length + ' sol' + (used.length > 1 ? 's' : '') + '), an estimate good to a few percent' };
+    }
+    return { pa: bin.pressure[1], kind: 'gale', src: 'Curiosity REMS at Gale Crater, not corrected for Jezero' };
   }
 
   /** Everything the planner needs to know about the chosen date. */
@@ -38,8 +66,10 @@
     const dust = MM.time.dustRisk(m.ls);
     let tmin, tmax, tsrc;
     if (meda) { tmin = num(meda.min_temp); tmax = num(meda.max_temp); tsrc = 'Perseverance MEDA, sol ' + meda.sol; }
-    else { tmin = bin.air_min ? bin.air_min[1] : -80; tmax = bin.air_max ? bin.air_max[1] : -20; tsrc = 'Curiosity REMS seasonal norm'; }
-    return { mars: m, bin, meda, dust, tmin, tmax, tsrc, live: !planDate };
+    else { tmin = bin.air_min ? bin.air_min[1] : -80; tmax = bin.air_max ? bin.air_max[1] : -20; tsrc = 'Curiosity REMS seasonal norm, Gale Crater stand-in'; }
+    const pr = pressureFor(m.ls, bin);
+    const plabel = { meda: 'Pressure at Jezero', scaled: 'Pressure at Jezero (est.)', gale: 'Pressure (Gale, uncorrected)' }[pr.kind];
+    return { mars: m, bin, meda, dust, tmin, tmax, tsrc, pressure: pr.pa, psrc: pr.src, plabel, live: !planDate };
   }
 
   function tick() {
@@ -75,13 +105,13 @@
     document.getElementById('cond-advice').innerHTML = `
       <div class="wx-grid">
         <div class="wx"><span>Air temperature</span><b>${fmt(c.tmin)}° / ${fmt(c.tmax)}° C</b><small>night low / afternoon high</small></div>
-        <div class="wx"><span>Pressure</span><b>${c.bin.pressure ? fmt(c.bin.pressure[1]) : '–'} Pa</b><small>under 1% of Earth's</small></div>
+        <div class="wx"><span>${c.plabel}</span><b>${fmt(c.pressure)} Pa</b><small>under 1% of Earth's</small></div>
         <div class="wx"><span>UV at noon</span><b>${uvTop ? uvTop[0].replace('_', ' ') : '–'}</b><small>no ozone shield</small></div>
         <div class="wx"><span>Dust-storm risk</span><b class="lvl${c.dust.level}">${c.dust.label}</b><small>${opTop ? 'sky usually ' + opTop[0].toLowerCase() : ''}</small></div>
       </div>
       <p class="note">${c.dust.note}</p>
       <p class="note"><b>Best EVA window:</b> ${MM.time.hhmm(best0)}–${MM.time.hhmm(best1)} LMST, when the Sun is high and the ground has warmed up.
-      Temperature source: ${c.tsrc}.</p>`;
+      Temperature source: ${c.tsrc}. Pressure source: ${c.psrc}.</p>`;
 
     // --- MEDA table
     const rows = W.meda.latest.slice().reverse();
@@ -106,7 +136,9 @@
         <div><span>Pressure</span><b>${range(b.pressure, ' Pa')}</b></div>
       </div>
       <p class="note">Median with the 10th to 90th percentile range, from ${W.rems.sols_in_record.toLocaleString()} sols measured by Curiosity in Gale Crater
-      (${W.rems.first_date} to ${W.rems.last_date}). Gale is 3,700 km from Jezero but equally close to the equator, so it is the best long-term reference.</p>`;
+      (${W.rems.first_date} to ${W.rems.last_date}). These are Gale numbers, not Jezero's: Gale is 3,700 km away at 4.6° S, while Jezero is at 18.4° N,
+      so the seasons do not line up exactly. Gale is used because it has the longest weather record on Mars. Curiosity also works far below Jezero's floor,
+      so its pressure reads higher; the planner scales it to Jezero with MEDA's own readings.</p>`;
     drawChart(m.ls);
   }
 

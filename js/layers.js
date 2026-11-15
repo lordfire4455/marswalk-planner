@@ -202,7 +202,8 @@
     if (T.inside(lat, lng)) {
       const z = T.elev(lat, lng), sl = T.slopeAt(lat, lng);
       if (!isNaN(z)) {
-        const c = T.CLASSES[T.classOf(sl)];
+        const lim = MM.planner ? MM.planner.settings().maxSlope : 20;      // same rule as the hazard layer and legend
+        const c = T.CLASSES[sl > lim ? T.CLASSES.length - 1 : T.classOf(sl)];
         s += '   ·   ' + Math.round(z) + ' m   ·   slope ' + sl.toFixed(1) + '° <i class="dot" style="background:' + c.color + '"></i>' + c.label;
       }
     } else s += '   ·   outside the elevation model';
@@ -278,8 +279,18 @@
     const T = MM.terrain;
     let html = '';
     if (state.overlays.hazard) {
-      html += '<div class="lg"><div class="lg-h">Slope hazard</div>' + T.CLASSES.map((c) =>
-        `<div class="lg-r"><i style="background:${c.color}"></i>${c.label}<span>${c.range}</span></div>`).join('') + '</div>';
+      // Match the raster: every class that starts below the slope limit keeps its colour,
+      // and everything steeper than the limit is drawn as no-go.
+      const lim = MM.planner ? MM.planner.settings().maxSlope : 20;
+      const last = T.CLASSES.length - 1, rows = [];
+      for (let i = 0; i < last; i++) {
+        const lo = i === 0 ? 0 : T.CLASSES[i - 1].max;
+        if (lo >= lim) break;
+        rows.push([T.CLASSES[i], lo + '–' + Math.min(T.CLASSES[i].max, lim) + '°']);
+      }
+      rows.push([T.CLASSES[last], '> ' + lim + '°']);
+      html += '<div class="lg"><div class="lg-h">Slope hazard</div>' + rows.map(([c, range]) =>
+        `<div class="lg-r"><i style="background:${c.color}"></i>${c.label}<span>${range}</span></div>`).join('') + '</div>';
     }
     if (state.overlays.elevation) {
       const stops = [0, 0.25, 0.5, 0.75, 1].map((t) => { const c = T.elevColor(T.minElev + t * (T.maxElev - T.minElev)); return `rgb(${c.map(Math.round).join(',')}) ${t * 100}%`; });
@@ -301,7 +312,7 @@
 
   MM.layers = {
     init, setBase, toggle, setOpacity, updateLegend, state, JEZERO, OVERLAYS, BASES,
-    redrawHazard: () => L_.over.hazard._redraw(),
+    redrawHazard: () => { L_.over.hazard._redraw(); updateLegend(); },
     targetsGroup: () => L_.over.targets,
     isOn: (id) => !!state.overlays[id],
   };

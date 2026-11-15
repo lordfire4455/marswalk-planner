@@ -86,6 +86,10 @@
           <div><label for="opt-start">Leave airlock (local time)</label><input type="time" id="opt-start" value="09:00"></div>
           <div><label for="opt-limit">Suit limit (hours)</label><input type="number" id="opt-limit" value="8" min="2" max="10" step="0.5"></div>
         </div>
+        <div class="field two">
+          <div><label for="opt-o2" title="Oxygen the suit can use for breathing. Set it to your suit's value.">Suit oxygen (g)</label><input type="number" id="opt-o2" value="600" min="50" max="5000" step="50"></div>
+          <div><label for="opt-walkback" title="Walkback rule: from any point, the crew must be able to walk to safety and get inside on backup oxygen alone.">Backup O₂ (min)</label><input type="number" id="opt-walkback" value="60" min="5" max="240" step="5"></div>
+        </div>
         <label class="switch-row"><input type="checkbox" id="opt-round" checked><span>Walk back to base at the end</span></label>
       </div>
 
@@ -102,6 +106,34 @@
           <button id="btn-share" class="ghost-btn">Copy link</button>
           <button id="btn-export" class="ghost-btn">GeoJSON</button>
         </div>
+      </div>
+
+      <div class="block" id="alloc-block" hidden>
+        <div class="block-h">Traverse allocation · crew or machine?</div>
+        <div class="alloc" id="alloc"></div>
+      </div>
+
+      <div class="block" id="why-block" hidden>
+        <div class="block-h">Why this route?
+          <span class="block-actions"><button id="why-map" class="mini-btn" title="Draw the straight lines and the quickest path on the map">Show on map</button></span>
+        </div>
+        <div class="why-key" id="why-key" hidden>
+          <span><i class="ln st"></i>Straight line</span><span><i class="ln no"></i>Steeper than your limit</span>
+          <span><i class="ln sp"></i>Over 15°</span><span><i class="ln fa"></i>Quickest path in limit</span>
+        </div>
+        <details class="why-how">
+          <summary>How the planner picks a route</summary>
+          <ol>
+            <li>The ground is cut into 20 m squares from NASA's CTX elevation model of Jezero, and every square gets a slope.</li>
+            <li>Squares steeper than your slope limit are closed. The route's grid steps never land on one.</li>
+            <li>Every step is scored by the time it takes to walk it, using the Apollo walking model: slow uphill (a 5° climb cuts speed by more than half) and slow on steep downhill.</li>
+            <li>That time is multiplied by a slope penalty: ×1.6 on a 10° slope, ×2.4 at 15°, ×3.5 at 20° and ×4.9 at 25°.</li>
+            <li>An A* search finds the path with the lowest total score, moving in 16 directions from each square. So the route often walks farther to stay on gentle ground. Usually that is only a few percent, but in steep country it can add kilometres; the comparison below shows how much on each leg.</li>
+            <li>If a stop sits on ground that is too steep, the route ends at the nearest safe square within 8 squares in each direction (up to about 220 m).</li>
+          </ol>
+          <p>Below, each leg is compared with the straight line between its two points and with the quickest path your limit allows (the same search without the slope penalty).</p>
+        </details>
+        <div id="why-body"></div>
       </div>
 
       <div class="block" id="nearby-block" hidden>
@@ -333,6 +365,7 @@
 <script src="js/science.js"></script>
 <script src="js/conditions.js"></script>
 <script src="js/planner.js"></script>
+<script src="js/explain.js"></script>
 <script src="js/briefing.js"></script>
 <script src="js/view3d.js"></script>
 <script src="js/intro.js"></script>
