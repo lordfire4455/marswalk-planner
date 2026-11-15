@@ -1040,3 +1040,6 @@ input:focus, select:focus, textarea:focus { border-color: rgba(95, 211, 239, .55
 .pf-bars { gap: 4px; }
 @media (max-width: 900px) { .pf-hero { grid-template-columns: minmax(0, 1fr); } .pf-bars { gap: 2px; } }
 @media (max-width: 1120px) and (min-width: 901px) { .snav-a[data-scroll="intro-brief"], .snav-a[data-scroll="intro-datasec"] { display: none !important; } }
+/* the sticky bar's full-bleed glass must not make the entrance scroll sideways */
+.intro-scroll { overflow-x: hidden; }
+.intro-top::before { left: 50%; right: auto; width: 100vw; transform: translateX(-50%); }
