@@ -32,9 +32,13 @@ Every number in the summary is tagged with where it comes from (NASA terrain, a 
 
 **How it works.** Everything runs in the browser, with no server. The elevation model is packed into the app, so hazards and routes are computed on the device. Walking speed on slopes comes from Apollo 14 traverse data, and energy use from a published load-carriage model evaluated at Mars gravity. These are the same models used in SEXTANT, the traverse planner NASA and MIT built for analog missions. Mars local time, season, sunrise and sunset come from the algorithm behind NASA's Mars24 clock. Weather combines Perseverance MEDA reports from Jezero with seasonal norms from the full 14-year Curiosity REMS record.
 
-**How we checked it.** The Mars clock reproduces the sol numbers and sunrise times in NASA's weather feeds. The elevation model agrees with Perseverance's own positions at all 708 rover waypoints, with a mean difference of 0.9 m.
+**How we checked it.** We tested the route planner against the real rover. Perseverance's 45 km drive was cut into 40 stretches of about 1 km, and the planner was given only each stretch's start and end. 80% of the planned route length lies within 100 m of the path NASA's rover drivers actually chose (median gap 44 m), with half as much ground over 15° (3.0% against the rover's 6.6%) and none over the slope limit. The Mars clock reproduces the sol numbers and sunrise times in NASA's weather feeds. The elevation model agrees with Perseverance's own positions at all 708 rover waypoints, with a mean difference of 0.9 m.
+
+**Measured impact and science at each stop.** Every plan reports its own impact: the steep ground a straight-line walk would cross, what the safe detour costs, science stops per EVA hour and oxygen left per suit. At every stop the app reads NASA's CRISM mineral maps and says which minerals are there (carbonate, clay, olivine and others) and why they matter for finding signs of ancient life.
 
 **Benefits.** A crew, or mission control, gets one screen instead of a dozen archives. The same tool works for students and the public: anyone can plan a walk to the rock that may hold signs of ancient life and see what it would take. Because the data is bundled, it works where a Mars crew would use it: with no connection to Earth.
+
+**Real-world uses.** The engine needs only an elevation model, so the same logic applies to Artemis moonwalks at the lunar south pole (slope, suit time, oxygen, sunlight), first-pass rover drive planning, field geology and analog missions on Earth, and mountain search and rescue.
 
 **What we would do next.** Add rock-abundance and sand-ripple hazards from HiRISE, live orbital dust maps, more landing sites, and a rover-plus-walk mode for longer trips.
 

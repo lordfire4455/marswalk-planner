@@ -20,14 +20,16 @@ Record the screen at 1920 × 1080 with live imagery on. Lines in quotes are the 
 3. **It reacts to rules (30 s).** Change the slope limit to 15° on the *Bright Angel sortie* and watch the route move. Set the start time to 16:30 and show the NO-GO for darkness. Switch the date to June 2026 and show the dust-season caution.
 4. **The crew learns something (30 s).** Click *Draw a no-go zone*, draw a box over the route ("boulder field") and watch the route bend around it. Then press *Compare* and show the safest, fastest and science-rich options as dashed lines on the map.
 5. **Science on the way (30 s).** Show *Science along the way* offering a nearby target and add it. Turn on the CRISM carbonate layer and point at the green ring along the crater margin: the "bathtub ring" of the ancient lake.
-6. **Trust (30 s).** Point at the tags on each number ("NASA terrain" or "Model") and open *How sure are we?*. Then open *Data & methods*. Eleven datasets, six missions. The clock matches NASA's sol numbers. The elevation model matches the rover's own positions at 708 waypoints (mean difference 0.9 m, standard deviation 3.4 m). Speed and energy models are the ones NASA and MIT use in SEXTANT.
-7. **Works on Mars (20 s).** Turn off Wi-Fi and open the copy of the app saved on the laptop (`index.html`). Everything except the live imagery still works, because a crew on Mars cannot wait 20 minutes for a server on Earth.
-8. **Close (10 s).** Open the EVA briefing and the 3D fly-through.
+6. **Proof (30 s).** On the overview, open *Proof* in the top bar. "We tested the planner against the real rover: on 40 stretches of Perseverance's drive, 80% of our route runs within 100 m of the path NASA's drivers chose, with half as much steep ground." Click *See both paths on the map*. Then show *Measured impact of this plan* and *Science at your stops* in the demo mission summary.
+7. **Trust (30 s).** Point at the tags on each number ("NASA terrain" or "Model") and open *How sure are we?*. Then open *Data & methods*. Eleven datasets, six missions. The clock matches NASA's sol numbers. The elevation model matches the rover's own positions at 708 waypoints (mean difference 0.9 m, standard deviation 3.4 m). Speed and energy models are the ones NASA and MIT use in SEXTANT.
+8. **Works on Mars (20 s).** Turn off Wi-Fi and open the copy of the app saved on the laptop (`index.html`). Everything except the live imagery still works, because a crew on Mars cannot wait 20 minutes for a server on Earth.
+9. **Close (10 s).** Open the EVA briefing and the 3D fly-through.
 
 ## Questions judges may ask
 
 - **Is the data real?** Yes. Nothing is simulated. Every product ID is in docs/DATA_SOURCES.md.
-- **How accurate is the route?** As good as a 20 m elevation model allows. It avoids steep ground but cannot see single rocks, so the HiRISE layer is there for a visual check.
+- **How accurate is the route?** We measured it: on 40 stretches of Perseverance's real drive, 80% of the planned route lies within 100 m of the rover's path (median gap 44 m). It cannot see single rocks under 20 m, so the HiRISE layer is there for a visual check.
+- **What is the measurable impact?** Each plan shows it: steep ground avoided against a straight line, the cost of the detour, science per EVA hour, oxygen margin. Across the validation stretches, planned routes put 3.0% of the walk on slopes over 15°, against 5.8% for straight lines.
 - **Why Curiosity weather for Jezero?** Perseverance's public feed is not updated every sol. Curiosity has 14 years of data at a similar distance from the equator, so it gives the best seasonal norm. When MEDA data exists for the same season, the app uses it instead.
 - **If a judge has only a minute?** Press *Tour* in the top bar, then the play button. It walks through the whole app on its own.
 - **What if the crew sees something the orbiter missed?** Draw a no-go zone or log a field report with its confidence level. Routes re-plan at once, and the reports go into the share link, the briefing and the GeoJSON.

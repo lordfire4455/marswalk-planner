@@ -77,6 +77,12 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 - The Mars clock reproduces the sol number and sunrise time in NASA's weather feeds (Perseverance sol 1127 on 2024-04-21, sunrise 06:13; Curiosity sol 4995 on 2026-08-25).
 - The elevation model agrees with Perseverance's own localization at all 708 rover waypoints: mean difference 0.9 m, standard deviation 3.4 m.
 - Sample-site positions are the rover waypoints for the sols on which each sample was collected.
+- **Route choice, against Perseverance.** We cut the rover's real drive into 40 stretches of about 1 km (40.7 km in all) and gave the planner only each stretch's start and end. 80% of the planned route length lies within 100 m of the path JPL's drivers chose (median stretch 100%, median gap 44 m). Only 3.0% of the planned routes is on slopes over 15°, against 6.6% for the rover and 5.8% for straight lines, and none is over the 25° limit. Rebuild it with `node tools/validate_routes.js`; see it with the *Planner vs Perseverance* layer.
+
+## Measured impact and science at each stop
+
+- Every plan shows its own measured impact: the steep ground a straight-line walk would cross, the extra distance the safe route costs, science stops per EVA hour and the oxygen left per suit.
+- At every stop and science target the app reads the MRO CRISM browse products (Viviano-Beck et al. 2014) and reports a relative band strength for carbonate, Fe/Mg clay, hydrated minerals, olivine, pyroxene and chlorite, with what each mineral means for the search for life. This needs the online version, because browsers do not let a page read image pixels over `file://`.
 
 ## Limits
 

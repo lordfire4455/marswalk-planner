@@ -273,6 +273,7 @@
     $('verdict').className = 'verdict ' + v[0];
     $('verdict').innerHTML = `<b>${v[1]}</b><span>${v[2]}</span>`;
     $('takeaway').innerHTML = '<span class="takeaway-k">Key takeaway</span>' + esc(takeaway(plan));
+    renderImpact(plan);
     if (plan.ok) {
       const st = [
         ['Distance', km(plan.distance), plan.roundTrip ? 'round trip' : 'one way', 'data'],
@@ -294,6 +295,55 @@
     $('trust-legend').hidden = !plan.ok; $('howsure').hidden = !plan.ok; $('cmp').hidden = !plan.ok;
     $('checks').innerHTML = plan.checks.map((c) => `<li class="${['go', 'caution', 'nogo'][c.level]}"><b>${c.title}</b><span>${esc(c.text)}</span></li>`).join('');
     document.querySelectorAll('#btn-brief,#btn-3d,#btn-share,#btn-export').forEach((b) => { b.disabled = !plan.ok; });
+  }
+
+  /**
+   * Measured impact of planning, for this route: what walking straight would have meant, what the
+   * detour costs, how much science each EVA hour buys and how much oxygen is left. All from the DEM
+   * and the plan, so the numbers change with every edit.
+   */
+  function impactOf(p) {
+    const T = MM.terrain;
+    let straight = 0, over = 0, over15 = 0;
+    for (const L of p.legs) {
+      const a = L.from, b = L.to, d = T.dist(a.lat, a.lon, b.lat, b.lon), n = Math.max(1, Math.round(d / 10));
+      straight += d;
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, s = T.slopeAt(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t);
+        if (s > S.maxSlope) over += d / n;
+        if (s > 15) over15 += d / n;
+      }
+    }
+    const route15 = p.classDist.slice(3).reduce((x, y) => x + y, 0);
+    const sciStops = p.stops.length - 1;
+    const kinds = new Set();
+    if (MM.site) for (const s of p.stops.slice(1)) { const m = MM.site.minerals(s.lat, s.lon); if (m) m.forEach((x) => { if (x.level >= 2) kinds.add(x.label); }); }
+    return { straight, over, over15, route15, avoided15: Math.max(0, over15 - route15), extra: straight ? p.distance / straight - 1 : 0,
+      perHour: sciStops / Math.max(0.25, p.totalSeconds / 3600), sciStops, o2Left: Math.max(0, 1 - p.o2Grams / (S.o2Kg * 1000)), kinds: [...kinds] };
+  }
+
+  function renderImpact(p) {
+    const el = $('impact'), sc = $('stop-sci');
+    if (!p.ok) { el.innerHTML = ''; sc.innerHTML = ''; return; }
+    const I = impactOf(p), m = (v) => Math.round(v).toLocaleString('en-US') + ' m';
+    const first = I.over > 0
+      ? ['Walking straight', 'Impossible', m(I.over) + ' of the straight line is steeper than your ' + S.maxSlope + '° limit', 'bad']
+      : ['Steep ground avoided', m(I.avoided15), 'of slopes over 15° that a straight-line walk would cross', I.avoided15 > 0 ? 'good' : ''];
+    const tiles = [first,
+      ['Cost of safety', '+' + Math.round(I.extra * 100) + '%', 'distance vs the straight line (' + km(I.straight) + ')', ''],
+      ['Science per EVA hour', I.perHour.toFixed(1), I.sciStops + ' stop' + (I.sciStops === 1 ? '' : 's') + ' in ' + hmShort(p.totalSeconds), ''],
+      ['Oxygen margin', Math.round(I.o2Left * 100) + '%', 'left per suit at the end of the walk', I.o2Left < O2_RESERVE ? 'bad' : 'good']];
+    el.innerHTML = '<div class="impact-h">Measured impact of this plan</div><div class="impact-grid">' +
+      tiles.map((t) => `<div class="imp ${t[3]}"><span>${t[0]}</span><b>${t[1]}</b><small>${t[2]}</small></div>`).join('') + '</div>';
+    // Science at each stop, from the CRISM mineral maps
+    const rows = p.stops.slice(1).map((s, i) => {
+      const t = s.targetId && MM.science.get(s.targetId);
+      const mins = MM.site ? MM.site.minerals(s.lat, s.lon) : undefined;
+      const top = mins && mins.find((x) => x.level >= 2);
+      return `<li><b>${esc(s.name || 'Stop ' + (i + 1))}</b><div class="min-row">${MM.site ? MM.site.chips(mins, 3) : ''}</div>${top ? `<p>${esc(top.why)}</p>` : t ? `<p>${esc(t.why)}</p>` : ''}</li>`;
+    });
+    sc.innerHTML = rows.length ? `<div class="impact-h">Science at your stops <em>MRO CRISM minerals, read at each stop</em></div><ul>${rows.join('')}</ul>` +
+      (I.kinds.length ? `<div class="stop-sci-sum">This walk reaches <b>${I.kinds.length}</b> mineral type${I.kinds.length === 1 ? '' : 's'} with a moderate or strong signal: ${esc(I.kinds.join(', '))}.</div>` : '') : '';
   }
 
   // Where each number comes from, shown as a small tag on every stat (idea: label evidence, not just values).
@@ -625,7 +675,7 @@
   function fieldChanged() { compute(); if (S.stops.length < 2) saveHash(); }
 
   MM.planner = {
-    init, addPoint, addTarget, clear, load, loadHash, refresh, fit, serialize, drawProfile, fieldChanged, compareRoutes, takeaway,
+    init, addPoint, addTarget, clear, load, loadHash, refresh, fit, serialize, drawProfile, fieldChanged, compareRoutes, takeaway, impactOf,
     settings: () => S, plan: () => plan, EGRESS_MIN, INGRESS_MIN, RESERVE_MIN, MODES, hm, hmShort, km,
   };
 })();

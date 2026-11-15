@@ -85,6 +85,16 @@
           <li><b>No-go zones and field reports.</b> Areas the crew draws are burned into a mask over the 20 m grid, and the route search treats those cells as impassable. A hazard report can keep routes 50 to 200 m away. Each report carries a confidence label: Measured, Observed or Estimated.</li>
           <li><b>Route options.</b> "Safest" weights slope strongly (hazard factor 1 + 2.5 (s / limit)²); "Fastest" nearly ignores slope below the limit; "Science-rich" adds up to three targets near the route while the suit reserve still holds.</li>
         </ul>
+        ${window.MM_VALIDATION ? (() => { const V = window.MM_VALIDATION.summary; return `<h3>Validation against Perseverance</h3>
+        <p>${window.MM_VALIDATION.method}</p>
+        <ul>
+          <li><b>Agreement.</b> ${Math.round(V.within100_overall * 100)}% of the planned routes lie within 100 m of the rover's track (median stretch ${Math.round(V.within100_median * 100)}%, median gap ${V.mean_offset_median_m} m) over ${V.stretches} stretches and ${V.rover_km} km of driving.</li>
+          <li><b>Steep ground.</b> ${(V.plan_steep15 * 100).toFixed(1)}% of the planned routes is on slopes over 15°, against ${(V.rover_steep15 * 100).toFixed(1)}% for the rover and ${(V.straight_over15_m / V.straight_km / 10).toFixed(1)}% for straight lines between the same points.</li>
+          <li><b>Length.</b> The planner's routes are ${Math.round((1 - V.length_ratio) * 100)}% shorter than the rover's drive, which also detoured to science targets and turned on the spot.</li>
+          <li><b>Reproduce it.</b> <code>node tools/validate_routes.js</code> rebuilds <code>data/validation.js</code> from the bundled data.</li>
+        </ul>`; })() : ''}
+        <h3>Minerals at a point</h3>
+        <p>Each CRISM browse image stores three spectral band indices as its red, green and blue channels (Viviano-Beck et al. 2014): MAF for olivine and pyroxene, CAR for clay, carbonate and hydration, PFM for chlorite and Fe/Mg clays. The planner averages a 5 × 5 pixel window (about 90 m) at each stop and reports a relative strength: weak, moderate or strong. It shows where a mineral is likely, not how much is there.</p>
         <h3>Limits you should know</h3>
         <ul>
           <li>A 20 m grid cannot see individual rocks or sand ripples. Use the HiRISE layer to check the last metres by eye.</li>
@@ -106,6 +116,7 @@
       MM.conditions.init();
       MM.field.init();
       MM.planner.init();
+      if (MM.site) MM.site.load().then((ok) => { if (ok) { MM.science.refresh(); MM.planner.refresh(); } });
 
       $('presets').innerHTML = PRESETS.map((p, i) => `<button class="preset" data-preset="${p.id}"><span class="preset-ico">${String(i + 1).padStart(2, '0')}</span><span><b>${p.title}</b><small>${p.sub}</small></span></button>`).join('');
       $('presets').addEventListener('click', (e) => { const b = e.target.closest('[data-preset]'); if (b) runPreset(b.dataset.preset); });

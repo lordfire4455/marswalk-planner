@@ -78,6 +78,8 @@
       </div>
       <div class="brief-cap">${esc(C.dust.note)} Temperature source: ${esc(C.tsrc)}.</div>
 
+      ${MM.site && MM.site.state() === 'ready' && plan.stops.length > 1 ? '<h3>Minerals at each stop (MRO CRISM)</h3><ul class="brief-sci">' + plan.stops.slice(1).map((s) => { const m = MM.site.minerals(s.lat, s.lon); return `<li><b>${esc(s.name)}</b>: ${esc(MM.site.short(m, 3))}.</li>`; }).join('') + '</ul>' : ''}
+
       ${sci.length ? '<h3>Science objectives</h3><ul class="brief-sci">' + sci.map((t) => `<li><b>${esc(t.name)}</b> (${esc(t.unit)}${t.sample ? '; ' + esc(t.sample) : ''}). ${esc(t.why)}</li>`).join('') + '</ul>' : ''}
 
       ${fieldHtml()}

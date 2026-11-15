@@ -40,6 +40,7 @@
       <div class="pop-meta">${t.unit}${t.sample ? ' · <b>' + t.sample + '</b>' : ''}</div>
       <p>${t.why}</p>
       <div class="pop-meta">${t.lat.toFixed(5)}° N, ${t.lon.toFixed(5)}° E · ${Math.round(t.elev_m)} m · suggested stop ${t.stop_min} min</div>
+      ${measured(t)}
       <div class="pop-src">${t.source}</div>
       <button class="primary-btn sm" data-add-target="${t.id}">Add to route</button>
     </div>`;
@@ -55,7 +56,7 @@
         icon: L.divIcon({ className: '', html: `<div class="tpin ${t.kind}" style="--c:${k.color}">${k.icon}</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
       });
       m.bindTooltip(t.name, { direction: 'top', offset: [0, -8] });
-      m.bindPopup(popupHtml(t), { maxWidth: 300, className: 'mm-popup' });
+      m.bindPopup(() => popupHtml(t), { maxWidth: 300, className: 'mm-popup' });
       m.on('click', (e) => { L.DomEvent.stopPropagation(e); });
       grp.addLayer(m);
       markers[t.id] = m;
@@ -116,10 +117,19 @@
         <div class="sci-top"><span class="sci-ico" style="color:${k.color}">${k.icon}</span>
           <div><div class="sci-name">${t.name}</div><div class="sci-meta">${t.unit} · sol ${t.sol}${t.sample ? ' · ' + t.sample : ''}</div></div></div>
         <p>${t.why}</p>
+        ${measured(t)}
         <div class="row-btns"><button class="ghost-btn sm" data-show-target="${t.id}">Show on map</button>
           <button class="primary-btn sm" data-add-target="${t.id}">Add to route</button></div>
       </div>`;
     }).join('');
+  }
+
+  /** "Measured here": terrain and CRISM minerals read from the NASA data at the target. */
+  function measured(t) {
+    if (!MM.site) return '';
+    const d = MM.site.at(t.lat, t.lon);
+    const terr = d.inside ? `${Math.round(d.elev).toLocaleString('en-US')} m · slope ${d.slope.toFixed(0)}°` : '';
+    return `<div class="sci-data"><span class="sci-data-k">Measured here</span>${terr ? `<span class="sci-terr">${terr}</span>` : ''}${MM.site.chips(d.minerals, 3)}</div>`;
   }
 
   function show(id) {
@@ -131,5 +141,5 @@
   }
 
   const get = (id) => targets.find((t) => t.id === id);
-  MM.science = { init, get, all: () => targets, show, declutter, KIND };
+  MM.science = { init, get, all: () => targets, show, declutter, KIND, refresh: () => renderList(), measured };
 })();
