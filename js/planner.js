@@ -10,13 +10,16 @@
 
   // Defaults for the two consumable rules. They are planning settings, not the spec of a real suit.
   const WALKBACK_MIN = 60, O2_G = 600, O2_THIN = 0.85, WALKBACK_THIN = 0.85;
+  // Route priority. The hazard weight scales how strongly the route finder avoids sloping ground.
+  const MODES = { safe: { label: 'Safest', k: 2.5 }, fast: { label: 'Fastest', k: 0.15 } };
 
-  const S = { stops: [], maxSlope: 20, pace: 'nominal', startH: 9, limitH: 8, roundTrip: true, walkbackMin: WALKBACK_MIN, o2G: O2_G };
-  let plan = null, legCache = new Map(), layer = null, hoverMarker = null, computeToken = 0;
+  const S = { stops: [], maxSlope: 20, pace: 'nominal', startH: 9, limitH: 8, roundTrip: true, mode: 'safe', crew: 2, walkbackMin: WALKBACK_MIN, o2G: O2_G };
+  let plan = null, legCache = new Map(), layer = null, hoverMarker = null, computeToken = 0, cmp = null, cmpLayer = null;
   const $ = (id) => document.getElementById(id);
   const hm = (sec) => { const m = Math.round(sec / 60); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min'; };
   const hmShort = (sec) => { const m = Math.round(sec / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') + ' h'; };
   const km = (m) => (m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m');
+  const BASE_ICO = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 7.2 8 2.8l5.5 4.4v6H2.5z"/><path d="M6.4 13.2V9.6h3.2v3.6"/></svg>';
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ------------------------------------------------------------------ stops
@@ -50,11 +53,12 @@
   function clear() { S.stops = []; compute(); }
 
   // ------------------------------------------------------------------ routing
-  function legKey(a, b) { return [a.lat.toFixed(6), a.lon.toFixed(6), b.lat.toFixed(6), b.lon.toFixed(6), S.maxSlope, S.pace].join('|'); }
-  function legFor(a, b) {
-    const k = legKey(a, b);
+  const fieldVersion = () => (MM.field ? MM.field.version() : 0);
+  function legKey(a, b, mode) { return [a.lat.toFixed(6), a.lon.toFixed(6), b.lat.toFixed(6), b.lon.toFixed(6), S.maxSlope, S.pace, mode, fieldVersion()].join('|'); }
+  function legFor(a, b, mode) {
+    const k = legKey(a, b, mode);
     if (legCache.has(k)) return legCache.get(k);
-    const r = MM.router.route([a.lat, a.lon], [b.lat, b.lon], { maxSlope: S.maxSlope, pace: S.pace });
+    const r = MM.router.route([a.lat, a.lon], [b.lat, b.lon], { maxSlope: S.maxSlope, pace: S.pace, hazardK: MODES[mode].k, blocked: MM.field ? MM.field.mask() : null });
     if (legCache.size > 200) legCache.clear();
     legCache.set(k, r);
     return r;
@@ -72,9 +76,11 @@
     }, 30));
   }
 
-  function build() {
-    const base = S.stops[0];
-    const seq = S.stops.slice();
+  /** Build a full plan for a list of stops. Pure: does not touch the current plan, so it also serves the route comparison. */
+  function build(stops, mode) {
+    stops = stops || S.stops; mode = mode || S.mode;
+    const base = stops[0];
+    const seq = stops.slice();
     if (S.roundTrip) seq.push(Object.assign({}, base, { isReturn: true, stopMin: 0, name: 'Back at base' }));
     const legs = [];
     const m = { d: [], z: [], slope: [], cls: [], los: [], lat: [], lon: [], clock: [], walk: [], leg: [] };
@@ -84,7 +90,7 @@
     let ok = true, fail = null;
     for (let i = 0; i < seq.length - 1; i++) {
       const a = seq[i], b = seq[i + 1];
-      const r = legFor(a, b);
+      const r = legFor(a, b, mode);
       if (!r.ok) {
         ok = false; fail = fail || { from: a, to: b, reason: r.reason };
         legs.push({ ok: false, from: a, to: b, line: [[a.lat, a.lon], [b.lat, b.lon]], reason: r.reason });
@@ -119,7 +125,7 @@
     const kcal = energy / 4184;
     const wb = ok ? walkback(m, walk) : null;
     const p = {
-      ok, fail, legs, m, stopInfo, base, roundTrip: S.roundTrip, slopeLimit: S.maxSlope, pace: S.pace,   // the rules this plan was routed with
+      ok, fail, legs, m, stopInfo, base, stops, mode, roundTrip: S.roundTrip, slopeLimit: S.maxSlope, pace: S.pace,   // the rules this plan was routed with
       distance: dist, walkSeconds: walk, scienceSeconds: sci, overheadSeconds: overhead, totalSeconds: total,
       ascent: up, descent: down, maxSlope, classDist, energyKcal: kcal, avgWatts: total ? energy / total : 0,
       o2Grams: kcal / KCAL_PER_L_O2 * O2_G_PER_L, losFraction: m.d.length ? losOk / m.d.length : 1,
@@ -157,11 +163,13 @@
   function evaluate(p) {
     const C = MM.conditions.current(), m = C.mars, out = [];
     const add = (level, title, text) => out.push({ level, title, text });
+    const zones = MM.field ? MM.field.zones().length + MM.field.observations().filter((o) => o.avoid > 0).length : 0;
     p.allocation = null;
     if (!p.ok) {
-      const why = { 'no-path': 'every way through is steeper than ' + S.maxSlope + '°', 'start-steep': 'the start point sits on ground steeper than ' + S.maxSlope + '°',
-        'goal-steep': 'the destination sits on ground steeper than ' + S.maxSlope + '°', outside: 'a point is outside the elevation model' }[p.fail.reason] || 'no route was found';
-      add(2, 'No safe route', 'From ' + p.fail.from.name + ' to ' + p.fail.to.name + ': ' + why + '. Raise the slope limit or move the point.');
+      const why = { 'no-path': 'every way through is steeper than ' + S.maxSlope + '°' + (zones ? ' or crosses a no-go zone' : ''), 'start-steep': 'the start point sits on ground steeper than ' + S.maxSlope + '°',
+        'goal-steep': 'the destination sits on ground steeper than ' + S.maxSlope + '°', 'start-zone': 'the start point is inside a no-go zone', 'goal-zone': 'the destination is inside a no-go zone',
+        outside: 'a point is outside the elevation model' }[p.fail.reason] || 'no route was found';
+      add(2, 'No safe route', 'From ' + p.fail.from.name + ' to ' + p.fail.to.name + ': ' + why + '. ' + (/zone/.test(why) ? 'Move the point or remove the zone.' : 'Raise the slope limit or move the point.'));
       return out;
     }
     const limit = S.limitH * 3600, reserve = RESERVE_MIN * 60;
@@ -185,6 +193,7 @@
     if (p.o2Grams > S.o2G) add(2, 'Not enough oxygen', 'This EVA burns about ' + Math.ceil(p.o2Grams) + ' g of oxygen but the suit holds ' + S.o2G + ' g. Shorten the walk or the stops.');
     else if (p.o2Grams > S.o2G * O2_THIN) add(1, 'Thin oxygen margin', 'About ' + o2 + ' g of the suit\'s ' + S.o2G + ' g (' + o2Pct + '%), leaving less than ' + Math.round((1 - O2_THIN) * 100) + '% spare for hard work or a leak.');
     else add(0, 'Oxygen', 'About ' + o2 + ' g of the suit\'s ' + S.o2G + ' g (' + o2Pct + '%) for breathing.');
+    if (S.crew < 2) add(1, 'Solo EVA', 'Nobody is there to help if a suit or an ankle fails. Walk with at least two crew.');
 
     const steep = p.classDist.slice(2).reduce((a, b) => a + b, 0), hard = p.classDist.slice(3).reduce((a, b) => a + b, 0);
     const pct = (v) => Math.round(v / Math.max(1, p.distance) * 100);
@@ -216,8 +225,12 @@
     const moved = p.legs.filter((l) => l.ok && l.snapped && !l.to.isReturn).map((l) => l.to.name);
     if (moved.length) add(1, 'Steep destination', moved.join(', ') + (moved.length > 1 ? ' sit' : ' sits') + ' on ground steeper than ' + S.maxSlope + '°. The route stops at the nearest safe spot beside it.');
 
+    if (zones) add(0, 'No-go zones', 'The route stays clear of ' + zones + ' area' + (zones > 1 ? 's' : '') + ' the crew marked as no-go.');
+    const near = MM.field ? MM.field.nearRoute(p.m, 100).filter((x) => !x.o.avoid) : [];
+    if (near.length) add(1, 'Hazard reported near the route', near.map((x) => '"' + (x.o.note || 'Hazard') + '" ' + Math.round(x.d) + ' m away').join('; ') + '. Check it on the map, or set the report to keep routes away.');
+
     if (!p.roundTrip) {
-      const last = S.stops[S.stops.length - 1];
+      const last = p.stops[p.stops.length - 1];
       const gap = MM.terrain.dist(p.base.lat, p.base.lon, last.lat, last.lon);
       if (gap > 200) add(1, 'One-way walk', 'The EVA ends ' + km(gap) + ' from base. A rover pickup must be waiting at ' + last.name + '.');
     }
@@ -232,7 +245,7 @@
   // ------------------------------------------------------------------ rendering
   function renderAll() {
     if (MM.view3d && MM.view3d.isOpen()) MM.view3d.close();
-    renderMap(); renderStops(); renderSummary(); renderProfile(); renderNearby(); saveHash();
+    clearCompare(); renderMap(); renderStops(); renderSummary(); renderProfile(); renderNearby(); saveHash();
     if (MM.explain) MM.explain.update(plan);
   }
 
@@ -259,7 +272,7 @@
     S.stops.forEach((s, i) => {
       const mk = L.marker([s.lat, s.lon], {
         draggable: true, pane: 'pins', zIndexOffset: 1000,
-        icon: L.divIcon({ className: '', html: `<div class="spin-pin ${i === 0 ? 'base' : ''}">${i === 0 ? '⌂' : i}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }),
+        icon: L.divIcon({ className: '', html: `<div class="spin-pin ${i === 0 ? 'base' : ''}">${i === 0 ? BASE_ICO : i}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
       });
       mk.bindTooltip(esc(s.name) + ' (drag to move, click to remove)', { direction: 'top', offset: [0, -12] });
       mk.bindPopup(`<div class="pop">
@@ -291,7 +304,7 @@
       if (i > 0 && info && info.arrive != null) meta = MM.time.hhmm(S.startH + info.arrive / 3600) + ' LMST · ' + km(info.d);
       if (i > 0 && plan && info && info.arrive == null) meta = 'Not reachable';
       return `<li class="stop" data-i="${i}">
-        <span class="stop-n ${i === 0 ? 'base' : ''}">${i === 0 ? '⌂' : i}</span>
+        <span class="stop-n ${i === 0 ? 'base' : ''}">${i === 0 ? BASE_ICO : i}</span>
         <span class="stop-main"><span class="stop-name">${esc(s.name)}</span><span class="stop-meta">${meta}</span></span>
         ${i > 0 ? `<label class="stop-min" title="Minutes of work at this stop"><input type="number" min="0" max="240" step="5" value="${s.stopMin}"><span>min</span></label>` : '<span class="stop-min"></span>'}
         <span class="stop-btns"><button data-act="up" title="Earlier" ${i === 0 ? 'disabled' : ''}>↑</button><button data-act="down" title="Later" ${i === S.stops.length - 1 ? 'disabled' : ''}>↓</button><button data-act="del" title="Remove">×</button></span>
@@ -307,24 +320,27 @@
     const v = [['go', 'GO', 'This Marswalk fits the rules.'], ['caution', 'GO WITH CAUTION', 'Possible, with the cautions below.'], ['nogo', 'NO-GO', 'Change the plan before anyone leaves the airlock.']][plan.verdict];
     $('verdict').className = 'verdict ' + v[0];
     $('verdict').innerHTML = `<b>${v[1]}</b><span>${v[2]}</span>`;
+    $('takeaway').innerHTML = '<span class="takeaway-k">Key takeaway</span>' + esc(takeaway(plan));
+    renderImpact(plan);
     if (plan.ok) {
       const st = [
-        ['Distance', km(plan.distance), plan.roundTrip ? 'round trip' : 'one way'],
-        ['EVA time', hmShort(plan.totalSeconds), 'of ' + S.limitH + ' h suit limit'],
-        ['Walking', hmShort(plan.walkSeconds), (plan.distance / Math.max(1, plan.walkSeconds) * 3.6).toFixed(1) + ' km/h average'],
-        ['Science time', hmShort(plan.scienceSeconds), (S.stops.length - 1) + ' stop' + (S.stops.length === 2 ? '' : 's')],
-        ['Climb', '↑' + Math.round(plan.ascent) + ' m', '↓' + Math.round(plan.descent) + ' m'],
-        ['Steepest', plan.maxSlope.toFixed(0) + '°', 'limit ' + S.maxSlope + '°'],
-        ['Energy', Math.round(plan.energyKcal) + ' kcal', Math.round(plan.avgWatts) + ' W average'],
-        ['Oxygen', Math.round(plan.o2Grams) + ' g', 'of ' + S.o2G + ' g in the suit'],
-        ['Radio contact', Math.round(plan.losFraction * 100) + '%', 'line of sight to base'],
-        ['Walkback', Math.ceil(plan.walkbackSeconds / 60 + INGRESS_MIN) + ' min', 'of ' + S.walkbackMin + ' min backup O₂'],
+        ['Distance', km(plan.distance), plan.roundTrip ? 'round trip' : 'one way', 'data'],
+        ['EVA time', hmShort(plan.totalSeconds), 'of ' + S.limitH + ' h suit limit', 'model'],
+        ['Walking', hmShort(plan.walkSeconds), (plan.distance / Math.max(1, plan.walkSeconds) * 3.6).toFixed(1) + ' km/h average', 'model'],
+        ['Science time', hmShort(plan.scienceSeconds), (S.stops.length - 1) + ' stop' + (S.stops.length === 2 ? '' : 's'), 'plan'],
+        ['Climb', '↑' + Math.round(plan.ascent) + ' m', '↓' + Math.round(plan.descent) + ' m', 'data'],
+        ['Steepest', plan.maxSlope.toFixed(0) + '°', 'limit ' + S.maxSlope + '°', 'data'],
+        ['Energy', Math.round(plan.energyKcal) + ' kcal', Math.round(plan.avgWatts) + ' W average', 'model'],
+        ['Oxygen', Math.round(plan.o2Grams) + ' g', 'per suit, of ' + S.o2G + ' g', 'model'],
+        ['Radio contact', Math.round(plan.losFraction * 100) + '%', 'line of sight to base', 'data'],
+        ['Walkback', Math.ceil(plan.walkbackSeconds / 60 + INGRESS_MIN) + ' min', 'of ' + S.walkbackMin + ' min backup O₂', 'model'],
       ];
-      $('stats').innerHTML = st.map((r) => `<div class="stat"><span>${r[0]}</span><b>${r[1]}</b><small>${r[2]}</small></div>`).join('');
+      $('stats').innerHTML = st.map((r) => `<div class="stat"><span>${r[0]}<em class="tt ${r[3]}" title="${TRUST[r[3]][1]}">${TRUST[r[3]][0]}</em></span><b>${r[1]}</b><small>${r[2]}</small></div>`).join('');
       const T = MM.terrain;
       $('classbar').innerHTML = plan.classDist.map((d, k) => d > 0 ? `<i style="flex:${d};background:${T.CLASSES[k].color}" title="${T.CLASSES[k].label}: ${km(d)}"></i>` : '').join('');
       $('classbar-legend').innerHTML = plan.classDist.map((d, k) => d > 0 ? `<span><i class="dot" style="background:${T.CLASSES[k].color}"></i>${T.CLASSES[k].label} ${Math.round(d / plan.distance * 100)}%</span>` : '').join('');
     } else { $('stats').innerHTML = ''; $('classbar').innerHTML = ''; $('classbar-legend').innerHTML = ''; }
+    $('trust-legend').hidden = !plan.ok; $('howsure').hidden = !plan.ok; $('cmp').hidden = !plan.ok;
     $('checks').innerHTML = plan.checks.map((c) => `<li class="${['go', 'caution', 'nogo'][c.level]}"><b>${c.title}</b><span>${esc(c.text)}</span></li>`).join('');
     document.querySelectorAll('#btn-brief,#btn-3d,#btn-share,#btn-export').forEach((b) => { b.disabled = !plan.ok; });
     renderAllocation();
@@ -353,19 +369,178 @@
       <small class="alloc-foot">Same route for both. Machine: ${P.maxSlopeDeg}° traction limit, ${P.critSlopeDeg}° rollover limit, about ${P.solBudgetM} m per sol, half speed above ${P.slipFromDeg}° from wheel slip. Planning estimate, not a flight rule.</small>`;
   }
 
-  function renderNearby() {
-    const blk = $('nearby-block');
-    if (!plan || !plan.ok) { blk.hidden = true; return; }
-    const m = plan.m, T = MM.terrain, used = new Set(S.stops.map((s) => s.targetId).filter(Boolean));
+  /**
+   * Measured impact of planning, for this route: what walking straight would have meant, what the
+   * detour costs, how much science each EVA hour buys and how much oxygen is left. All from the DEM
+   * and the plan, so the numbers change with every edit.
+   */
+  function impactOf(p) {
+    const T = MM.terrain;
+    let straight = 0, over = 0, over15 = 0;
+    for (const L of p.legs) {
+      const a = L.from, b = L.to, d = T.dist(a.lat, a.lon, b.lat, b.lon), n = Math.max(1, Math.round(d / 10));
+      straight += d;
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, s = T.slopeAt(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t);
+        if (s > S.maxSlope) over += d / n;
+        if (s > 15) over15 += d / n;
+      }
+    }
+    const route15 = p.classDist.slice(3).reduce((x, y) => x + y, 0);
+    const sciStops = p.stops.length - 1;
+    const kinds = new Set();
+    if (MM.site) for (const s of p.stops.slice(1)) { const m = MM.site.minerals(s.lat, s.lon); if (m) m.forEach((x) => { if (x.level >= 2) kinds.add(x.label); }); }
+    return { straight, over, over15, route15, avoided15: Math.max(0, over15 - route15), extra: straight ? p.distance / straight - 1 : 0,
+      perHour: sciStops / Math.max(0.25, p.totalSeconds / 3600), sciStops, o2Left: Math.max(0, 1 - p.o2Grams / S.o2G), kinds: [...kinds] };
+  }
+
+  function renderImpact(p) {
+    const el = $('impact'), sc = $('stop-sci');
+    if (!p.ok) { el.innerHTML = ''; sc.innerHTML = ''; return; }
+    const I = impactOf(p), m = (v) => Math.round(v).toLocaleString('en-US') + ' m';
+    const first = I.over > 0
+      ? ['Walking straight', 'Impossible', m(I.over) + ' of the straight line is steeper than your ' + S.maxSlope + '° limit', 'bad']
+      : ['Steep ground avoided', m(I.avoided15), 'of slopes over 15° that a straight-line walk would cross', I.avoided15 > 0 ? 'good' : ''];
+    const tiles = [first,
+      ['Cost of safety', '+' + Math.round(I.extra * 100) + '%', 'distance vs the straight line (' + km(I.straight) + ')', ''],
+      ['Science per EVA hour', I.perHour.toFixed(1), I.sciStops + ' stop' + (I.sciStops === 1 ? '' : 's') + ' in ' + hmShort(p.totalSeconds), ''],
+      ['Oxygen margin', Math.round(I.o2Left * 100) + '%', 'left per suit at the end of the walk', I.o2Left < 1 - O2_THIN ? 'bad' : 'good']];
+    el.innerHTML = '<div class="impact-h">Measured impact of this plan</div><div class="impact-grid">' +
+      tiles.map((t) => `<div class="imp ${t[3]}"><span>${t[0]}</span><b>${t[1]}</b><small>${t[2]}</small></div>`).join('') + '</div>';
+    // Science at each stop, from the CRISM mineral maps
+    const rows = p.stops.slice(1).map((s, i) => {
+      const t = s.targetId && MM.science.get(s.targetId);
+      const mins = MM.site ? MM.site.minerals(s.lat, s.lon) : undefined;
+      const top = mins && mins.find((x) => x.level >= 2);
+      return `<li><b>${esc(s.name || 'Stop ' + (i + 1))}</b><div class="min-row">${MM.site ? MM.site.chips(mins, 3) : ''}</div>${top ? `<p>${esc(top.why)}</p>` : t ? `<p>${esc(t.why)}</p>` : ''}</li>`;
+    });
+    sc.innerHTML = rows.length ? `<div class="impact-h">Science at your stops <em>MRO CRISM minerals, read at each stop</em></div><ul>${rows.join('')}</ul>` +
+      (I.kinds.length ? `<div class="stop-sci-sum">This walk reaches <b>${I.kinds.length}</b> mineral type${I.kinds.length === 1 ? '' : 's'} with a moderate or strong signal: ${esc(I.kinds.join(', '))}.</div>` : '') : '';
+  }
+
+  // Where each number comes from, shown as a small tag on every stat (idea: label evidence, not just values).
+  const TRUST = {
+    data: ['NASA terrain', 'Computed directly from the MRO CTX elevation model, which matches Perseverance\'s own positions to about a metre.'],
+    model: ['Model', 'Planning estimate from Apollo-derived walking and metabolic models. Not measured on Mars.'],
+    plan: ['Your input', 'Set by you in the plan.'],
+  };
+
+  /** One plain sentence a judge or a crew member can read in five seconds. */
+  function takeaway(p) {
+    if (!p.ok) { const c = p.checks.find((x) => x.level === 2); return c ? c.title + '. ' + c.text : 'No safe route was found.'; }
+    const n = p.stops.length - 1;
+    let s = 'A ' + km(p.distance) + (p.roundTrip ? ' round trip' : ' walk') + ' with ' + n + ' stop' + (n === 1 ? '' : 's') + ' takes ' + hm(p.totalSeconds) +
+      ' of the ' + S.limitH + ' h suit limit and about ' + (p.o2Grams / 1000).toFixed(2) + ' kg of oxygen per astronaut. ';
+    const worst = p.checks.filter((c) => c.level === p.verdict && c.level > 0);
+    if (!worst.length) return s + 'Every safety check passes.';
+    return s + (p.verdict === 2 ? 'It must change: ' : 'Watch out for: ') + worst.map((c) => c.title.toLowerCase()).join(', ') + '.';
+  }
+
+  /** Science targets within 600 m of a plan's route that it does not visit yet. */
+  function nearbyTargets(p) {
+    const m = p.m, T = MM.terrain, stops = p.stops, used = new Set(stops.map((s) => s.targetId).filter(Boolean));
     const rows = [];
     for (const t of MM.science.all()) {
       if (used.has(t.id)) continue;
       let best = Infinity, bi = 0;
       for (let k = 0; k < m.d.length; k += 2) { const d = T.dist(t.lat, t.lon, m.lat[k], m.lon[k]); if (d < best) { best = d; bi = k; } }
-      if (S.stops.some((s) => T.dist(s.lat, s.lon, t.lat, t.lon) < 40)) continue;
-      if (best <= 600) rows.push({ t, d: best, after: Math.min(m.leg[bi], S.stops.length - 1) });
+      if (stops.some((s) => T.dist(s.lat, s.lon, t.lat, t.lon) < 40)) continue;
+      if (best <= 600) rows.push({ t, d: best, k: bi, after: Math.min(m.leg[bi], stops.length - 1) });
     }
-    rows.sort((a, b) => a.d - b.d);
+    return rows.sort((a, b) => a.d - b.d);
+  }
+
+  // ------------------------------------------------------------------ route comparison
+  const CMP_COLORS = { safe: '#2fbf71', fast: '#59c3ff', science: '#c77dff' };
+  function clearCompare() {
+    cmp = null;
+    if (cmpLayer) { MM.map.removeLayer(cmpLayer); cmpLayer = null; }
+    const out = $('cmp-out'); if (out) out.innerHTML = '';
+    const b = $('btn-compare'); if (b) b.hidden = false;
+  }
+  /** Insert targets near the route, in walking order, then drop the farthest until the EVA fits the suit with its reserve. */
+  function scienceStops(p) {
+    let rows = nearbyTargets(p).slice(0, 3);
+    if (!rows.length) return null;
+    const make = (rs) => {
+      const out = [];
+      p.stops.forEach((s, i) => {
+        out.push(Object.assign({}, s));
+        rs.filter((r) => r.after === i).sort((a, b) => a.k - b.k).forEach((r) => out.push({ lat: r.t.lat, lon: r.t.lon, targetId: r.t.id, name: r.t.name, stopMin: r.t.stop_min }));
+      });
+      return out;
+    };
+    const limit = S.limitH * 3600 - RESERVE_MIN * 60;
+    for (;;) {
+      const stops = make(rows), q = build(stops, 'safe');
+      if ((q.ok && q.totalSeconds <= limit && q.verdict < 2) || rows.length === 1) return { stops, plan: q, added: rows.map((r) => r.t) };
+      rows = rows.slice(0, -1);
+    }
+  }
+  function compareRoutes() {
+    if (!plan || !plan.ok) return Promise.resolve();
+    const busy = $('busy'), msg = busy.lastChild, old = msg.textContent;
+    msg.textContent = 'Comparing three routes…'; busy.hidden = false;
+    return new Promise((resolve) => setTimeout(() => {
+      try {
+        const stops = S.stops.slice();
+        const safe = S.mode === 'safe' ? plan : build(stops, 'safe');
+        const fast = S.mode === 'fast' ? plan : build(stops, 'fast');
+        const sci = scienceStops(safe);
+        cmp = { safe, fast, sci };
+        renderCompare();
+      } catch (e) { console.error(e); MM.toast('Comparison failed: ' + e.message, 'error'); }
+      busy.hidden = true; msg.textContent = old; resolve();
+    }, 30));
+  }
+  function renderCompare() {
+    if (!cmp) return;
+    const opts = [
+      { id: 'safe', name: 'Safest', sub: 'Stays on the gentlest ground', p: cmp.safe, cur: S.mode === 'safe' },
+      { id: 'fast', name: 'Fastest', sub: 'Shortest walking time within your slope limit', p: cmp.fast, cur: S.mode === 'fast' },
+      cmp.sci ? { id: 'science', name: 'Science-rich', sub: '+' + cmp.sci.added.length + ': ' + cmp.sci.added.map((t) => t.name).join(', '), p: cmp.sci.plan, cur: false }
+        : { id: 'science', name: 'Science-rich', sub: 'No other targets within 600 m of this route.', p: null, cur: false },
+    ];
+    const ok = opts.filter((o) => o.p && o.p.ok);
+    const best = (f) => Math.min(...ok.map((o) => f(o.p)));
+    const bT = best((p) => p.totalSeconds), bS = best((p) => p.maxSlope), bE = best((p) => p.energyKcal), bC = best((p) => p.ascent);
+    const B = (v, b, txt) => (Math.abs(v - b) < 1e-6 && ok.length > 1 ? '<b class="best">' + txt + '</b>' : txt);
+    const V = ['GO', 'CAUTION', 'NO-GO'], VC = ['go', 'caution', 'nogo'];
+    $('cmp-out').innerHTML = '<div class="cmp-grid">' + opts.map((o) => {
+      const p = o.p;
+      if (!p || !p.ok) return `<div class="cmp-card off" style="--c:${CMP_COLORS[o.id]}"><div class="cmp-h"><i></i>${o.name}</div><small>${esc(p ? 'No safe route with these stops.' : o.sub)}</small></div>`;
+      return `<div class="cmp-card ${o.cur ? 'cur' : ''}" style="--c:${CMP_COLORS[o.id]}">
+        <div class="cmp-h"><i></i>${o.name}<span class="cmp-v ${VC[p.verdict]}">${V[p.verdict]}</span></div>
+        <small class="cmp-sub">${esc(o.sub)}</small>
+        <dl>
+          <div><dt>EVA time</dt><dd>${B(p.totalSeconds, bT, hmShort(p.totalSeconds))}</dd></div>
+          <div><dt>Distance</dt><dd>${km(p.distance)}</dd></div>
+          <div><dt>Steepest</dt><dd>${B(p.maxSlope, bS, p.maxSlope.toFixed(0) + '°')}</dd></div>
+          <div><dt>Climb</dt><dd>${B(p.ascent, bC, Math.round(p.ascent) + ' m')}</dd></div>
+          <div><dt>Energy</dt><dd>${B(p.energyKcal, bE, Math.round(p.energyKcal) + ' kcal')}</dd></div>
+          <div><dt>Science stops</dt><dd>${p.stops.length - 1}</dd></div>
+        </dl>
+        ${o.cur ? '<span class="cmp-cur">Current plan</span>' : `<button class="mini-btn hot" data-cmp-use="${o.id}">Use this route</button>`}
+      </div>`;
+    }).join('') + '</div><div class="hint cmp-note">Coloured dashed lines on the map show the other options. Best value in each row is bold.</div>';
+    $('btn-compare').hidden = true;
+    if (cmpLayer) MM.map.removeLayer(cmpLayer);
+    cmpLayer = L.layerGroup().addTo(MM.map);
+    opts.forEach((o) => {
+      if (o.cur || !o.p || !o.p.ok) return;
+      o.p.legs.forEach((l) => { if (l.ok) cmpLayer.addLayer(L.polyline(l.line, { pane: 'route', color: CMP_COLORS[o.id], weight: 3, opacity: 0.95, dashArray: '7 6', interactive: false })); });
+    });
+  }
+  function useCompare(id) {
+    if (!cmp) return;
+    if (id === 'safe' || id === 'fast') { S.mode = id; syncControls(); compute(); }
+    else if (id === 'science' && cmp.sci) { S.stops = cmp.sci.stops.map((s) => Object.assign({}, s)); S.mode = 'safe'; syncControls(); relabel(); compute(); MM.toast('Added ' + cmp.sci.added.map((t) => t.name).join(', ') + ' to the route.', 'ok'); }
+  }
+
+  function renderNearby() {
+    const blk = $('nearby-block');
+    if (!plan || !plan.ok) { blk.hidden = true; return; }
+    const rows = nearbyTargets(plan);
     blk.hidden = rows.length === 0;
     $('nearby').innerHTML = rows.slice(0, 6).map((r) => {
       const k = MM.science.KIND[r.t.kind];
@@ -452,13 +627,17 @@
   // ------------------------------------------------------------------ persistence
   function serialize() {
     return { v: 1, s: S.stops.map((s) => [Number(s.lat.toFixed(6)), Number(s.lon.toFixed(6)), s.targetId || (s.custom ? s.name : ''), s.stopMin, s.custom ? 1 : 0]),
-      ms: S.maxSlope, p: S.pace, st: S.startH, lim: S.limitH, rt: S.roundTrip ? 1 : 0, wb: S.walkbackMin, o2: S.o2G };
+      ms: S.maxSlope, p: S.pace, st: S.startH, lim: S.limitH, rt: S.roundTrip ? 1 : 0, md: S.mode, cr: S.crew, wb: S.walkbackMin, o2: S.o2G,
+      f: MM.field ? MM.field.serialize() || undefined : undefined };
   }
   function load(o, opts) {
     S.maxSlope = o.ms || 20; S.pace = o.p || 'nominal'; S.startH = o.st != null ? o.st : 9; S.limitH = o.lim || 8; S.roundTrip = !!o.rt;
+    S.mode = MODES[o.md] ? o.md : 'safe';
+    if (o.cr >= 1 && o.cr <= 6) S.crew = Math.round(o.cr);
     // Older links have neither; hand-edited ones are held to the same ranges as the inputs.
     const inRange = (v, lo, hi, dflt) => { v = Number(v); return v >= lo && v <= hi ? v : dflt; };
     S.walkbackMin = inRange(o.wb, 5, 240, WALKBACK_MIN); S.o2G = inRange(o.o2, 50, 5000, O2_G);
+    if (o.f && MM.field) MM.field.load(o.f);
     S.stops = (o.s || []).map((a) => {
       const t = a[2] && !a[4] ? MM.science.get(a[2]) : null;
       return { lat: a[0], lon: a[1], targetId: t ? t.id : null, name: t ? t.name : (a[4] ? a[2] : ''), custom: !!a[4], stopMin: a[3] || 0 };
@@ -491,10 +670,11 @@
     const fc = { type: 'FeatureCollection', name: 'marswalk-plan', crs: { type: 'name', properties: { name: 'IAU:49900 (Mars 2000 sphere, planetocentric, east-positive)' } }, features: [] };
     fc.features.push({ type: 'Feature', properties: { kind: 'route', distance_m: Math.round(plan.distance), eva_minutes: Math.round(plan.totalSeconds / 60), walking_minutes: Math.round(plan.walkSeconds / 60),
       ascent_m: Math.round(plan.ascent), descent_m: Math.round(plan.descent), max_slope_deg: Number(plan.maxSlope.toFixed(1)), energy_kcal: Math.round(plan.energyKcal),
-      slope_limit_deg: S.maxSlope, pace: S.pace, verdict: ['GO', 'GO WITH CAUTION', 'NO-GO'][plan.verdict] },
+      slope_limit_deg: S.maxSlope, pace: S.pace, route_priority: MODES[S.mode].label, crew: S.crew, o2_per_suit_kg: Number((plan.o2Grams / 1000).toFixed(3)), o2_supply_per_suit_kg: S.o2G / 1000, walkback_backup_min: S.walkbackMin, verdict: ['GO', 'GO WITH CAUTION', 'NO-GO'][plan.verdict] },
       geometry: { type: 'LineString', coordinates: m.d.map((_, k) => [Number(m.lon[k].toFixed(6)), Number(m.lat[k].toFixed(6)), Number(m.z[k].toFixed(1))]) } });
     S.stops.forEach((s, i) => fc.features.push({ type: 'Feature', properties: { kind: i === 0 ? 'base' : 'stop', order: i, name: s.name, stop_minutes: s.stopMin, target: s.targetId || null },
       geometry: { type: 'Point', coordinates: [Number(s.lon.toFixed(6)), Number(s.lat.toFixed(6))] } }));
+    if (MM.field) fc.features.push(...MM.field.geojson());
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(fc, null, 1)], { type: 'application/geo+json' }));
     a.download = 'marswalk-plan.geojson'; document.body.appendChild(a); a.click(); a.remove();
@@ -504,13 +684,14 @@
   function syncControls() {
     document.querySelectorAll('#opt-slope button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === S.maxSlope));
     document.querySelectorAll('#opt-pace button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.pace));
+    document.querySelectorAll('#opt-mode button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.mode));
     $('opt-start').value = MM.time.hhmm(S.startH); $('opt-limit').value = S.limitH; $('opt-round').checked = S.roundTrip;
-    $('opt-walkback').value = S.walkbackMin; $('opt-o2').value = S.o2G;
+    $('opt-crew').value = S.crew; $('opt-walkback').value = S.walkbackMin; $('opt-o2').value = S.o2G;
   }
 
   function init() {
     MM.map.on('click', (e) => {
-      if (!$('opt-click').checked || !$('tab-plan').classList.contains('active')) return;
+      if (!$('opt-click').checked || !$('tab-plan').classList.contains('active') || (MM.field && MM.field.drawing()) || (e.originalEvent && e.originalEvent._mmField)) return;
       addPoint(e.latlng.lat, e.latlng.lng);
     });
     $('opt-click').addEventListener('change', () => { $('map').classList.toggle('adding', $('opt-click').checked); });
@@ -528,8 +709,12 @@
     $('opt-start').addEventListener('change', (e) => { const p = e.target.value.split(':'); if (p.length === 2) { S.startH = Number(p[0]) + Number(p[1]) / 60; refresh(); } });
     $('opt-limit').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v >= 1 && v <= 12) { S.limitH = v; refresh(); } });
     $('opt-round').addEventListener('change', (e) => { S.roundTrip = e.target.checked; compute(); });
+    $('opt-mode').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || b.dataset.v === S.mode) return; S.mode = b.dataset.v; syncControls(); compute(); });
+    $('opt-crew').addEventListener('change', (e) => { const v = Math.round(parseFloat(e.target.value)); if (v >= 1 && v <= 6) { S.crew = v; refresh(); } else syncControls(); });
     $('opt-walkback').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v >= 5 && v <= 240) { S.walkbackMin = v; refresh(); } else syncControls(); });
     $('opt-o2').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v >= 50 && v <= 5000) { S.o2G = v; refresh(); } else syncControls(); });
+    $('btn-compare').addEventListener('click', compareRoutes);
+    $('cmp-out').addEventListener('click', (e) => { const b = e.target.closest('[data-cmp-use]'); if (b) useCompare(b.dataset.cmpUse); });
     $('stops').addEventListener('click', (e) => {
       const li = e.target.closest('.stop'); if (!li) return;
       const i = Number(li.dataset.i), b = e.target.closest('button');
@@ -560,10 +745,12 @@
     syncControls();
   }
 
-  function refresh() { if (plan) { plan.checks = evaluate(plan); plan.verdict = plan.checks.reduce((w, c) => Math.max(w, c.level), 0); } renderStops(); renderSummary(); saveHash(); }
+  function refresh() { if (plan) { plan.checks = evaluate(plan); plan.verdict = plan.checks.reduce((w, c) => Math.max(w, c.level), 0); } clearCompare(); renderStops(); renderSummary(); saveHash(); }
+  /** No-go zones changed: routes must be searched again. */
+  function fieldChanged() { compute(); if (S.stops.length < 2) saveHash(); }
 
   MM.planner = {
-    init, addPoint, addTarget, clear, load, loadHash, refresh, fit, serialize, drawProfile,
-    settings: () => S, plan: () => plan, EGRESS_MIN, INGRESS_MIN, RESERVE_MIN, WALKBACK_MIN, O2_G, hm, hmShort, km,
+    init, addPoint, addTarget, clear, load, loadHash, refresh, fit, serialize, drawProfile, fieldChanged, compareRoutes, takeaway, impactOf,
+    settings: () => S, plan: () => plan, EGRESS_MIN, INGRESS_MIN, RESERVE_MIN, WALKBACK_MIN, O2_G, MODES, hm, hmShort, km,
   };
 })();

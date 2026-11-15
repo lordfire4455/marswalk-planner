@@ -8,7 +8,7 @@ Marswalk Planner
 
 ## High-level summary
 
-The first astronauts at Jezero Crater will have decades of NASA data about the ground under their boots, spread across a dozen archives and formats. Marswalk Planner puts it on one map and answers the question that matters before anyone opens the airlock: is this walk safe today, and what science can we do on the way? The crew picks a base and their science stops. The app finds the safest path over a real 20 m elevation model, avoiding slopes that are too steep, and returns a go / no-go with walking time, energy, oxygen, daylight, dust risk and radio cover, plus a printable EVA briefing and a 3D fly-through. It combines eleven datasets from six NASA missions and keeps working with no internet connection.
+The first astronauts at Jezero Crater will have decades of NASA data about the ground under their boots, spread across a dozen archives and formats. Marswalk Planner puts it on one map and answers the question that matters before anyone opens the airlock: is this walk safe today, and what science can we do on the way? The crew picks a base and their science stops. The app finds the safest path over a real 20 m elevation model, avoiding slopes that are too steep, and returns a go / no-go with walking time, energy, oxygen against the suit supply, daylight, dust risk and radio cover, plus a printable EVA briefing and a 3D fly-through. The crew can draw no-go zones that every route avoids, log field reports with how sure they are, and compare the safest, fastest and science-rich options side by side. It combines eleven datasets from six NASA missions and keeps working with no internet connection.
 
 ## Link to project demo
 
@@ -16,22 +16,29 @@ The first astronauts at Jezero Crater will have decades of NASA data about the g
 
 ## Link to final project
 
-https://marswalk-map.netlify.app and [code repository link]
+https://marswalk-map.netlify.app and https://github.com/lordfire4455/marswalk-planner
 
 ## Detailed project description
 
-**What it does.** Marswalk Planner is a web app for planning a walk on Mars. It has four parts.
+**What it does.** Marswalk Planner is a web app for planning a walk on Mars. It has five parts.
 
 1. *See the ground.* A slope hazard layer colours every 20 m cell of Jezero Crater from easy to no-go. It is computed in the browser from the Mars Reconnaissance Orbiter CTX stereo elevation model that was made for Perseverance's landing navigation. Underneath are 6 m CTX and 25 cm HiRISE images, sharp enough to show single boulders. Extra layers show CRISM mineral maps (olivine and pyroxene, carbonates, clays), Mars Odyssey night-time infrared, which separates firm rock from loose sand, and elevation contours.
 2. *Pick your science.* Nineteen Perseverance sites are on the map at the positions the rover itself recorded: seventeen sample sites, the landing site and the Three Forks depot, where ten sealed sample tubes lie on the surface waiting to be picked up. Each has a short explanation of why it matters. Ingenuity's first airfield and final resting place are there too.
 3. *Plan the walk.* The crew clicks a base and their stops. An A* search over 2.4 million terrain cells finds the path with the lowest walking time once steep ground is penalised (each step's time is multiplied by a slope penalty), staying under the chosen slope limit, usually in under half a second. It gives up a little time to keep the crew on gentler ground, and the *Why this route?* panel shows how much on every leg. The planner then suggests science targets within 600 m of the route and inserts them in the right order.
-4. *Decide.* The summary gives a clear GO, GO WITH CAUTION or NO-GO with the reason for each check: suit time and reserve, the Apollo walkback rule (could the crew still get home on backup oxygen from every point?), suit oxygen, steep sections, daylight at Jezero for that date, expected temperature, dust-storm season, and how much of the route has radio line of sight to base. One click opens a printable EVA briefing with a timeline, elevation profile and science objectives. Another opens a 3D view that flies along the route.
+4. *Decide.* The summary gives a clear GO, GO WITH CAUTION or NO-GO with the reason for each check: suit time and reserve, the Apollo walkback rule (could the crew still get home on backup oxygen from every point?), suit oxygen, steep sections, daylight at Jezero for that date, expected temperature, dust-storm season, and how much of the route has radio line of sight to base. One click opens a printable EVA briefing with a timeline, elevation profile and science objectives. Another opens a 3D view that flies along the route. A *Compare* button lays the safest, fastest and science-rich routes side by side on the map.
+5. *Learn on the ground.* The crew draws no-go zones over sand, boulders or cliff edges, and every route re-plans around them. Field reports record a hazard, a find, a resource or a landmark with a confidence label (Measured, Observed or Estimated), the author and the Mars and Earth time. They travel with the share link and the GeoJSON export.
+
+Every number in the summary is tagged with where it comes from (NASA terrain, a planning model, or the crew's own input), a one-line key takeaway sums up the plan, and a one-minute guided tour walks a first-time user through all of it.
 
 **How it works.** Everything runs in the browser, with no server. The elevation model is packed into the app, so hazards and routes are computed on the device. Walking speed on slopes comes from Apollo 14 traverse data, and energy use from a published load-carriage model evaluated at Mars gravity. These are the same models used in SEXTANT, the traverse planner NASA and MIT built for analog missions. Mars local time, season, sunrise and sunset come from the algorithm behind NASA's Mars24 clock. Weather combines Perseverance MEDA reports from Jezero with seasonal norms from the full 14-year Curiosity REMS record.
 
-**How we checked it.** The Mars clock reproduces the sol numbers and sunrise times in NASA's weather feeds. The elevation model agrees with Perseverance's own positions at all 708 rover waypoints, with a mean difference of 0.9 m.
+**How we checked it.** We tested the route planner against the real rover. Perseverance's 45 km drive was cut into 40 stretches of about 1 km, and the planner was given only each stretch's start and end. 79% of the planned route length lies within 100 m of the path NASA's rover drivers actually chose (median gap 44 m), with half as much ground over 15° (2.9% against the rover's 6.6%) and none over the slope limit. The Mars clock reproduces the sol numbers and sunrise times in NASA's weather feeds. The elevation model agrees with Perseverance's own positions at all 708 rover waypoints, with a mean difference of 0.9 m.
+
+**Measured impact and science at each stop.** Every plan reports its own impact: the steep ground a straight-line walk would cross, what the safe detour costs, science stops per EVA hour and oxygen left per suit. At every stop the app reads NASA's CRISM mineral maps and says which minerals are there (carbonate, clay, olivine and others) and why they matter for finding signs of ancient life.
 
 **Benefits.** A crew, or mission control, gets one screen instead of a dozen archives. The same tool works for students and the public: anyone can plan a walk to the rock that may hold signs of ancient life and see what it would take. Because the data is bundled, it works where a Mars crew would use it: with no connection to Earth.
+
+**Real-world uses.** The engine needs only an elevation model, so the same logic applies to Artemis moonwalks at the lunar south pole (slope, suit time, oxygen, sunlight), first-pass rover drive planning, field geology and analog missions on Earth, and mountain search and rescue.
 
 **What we would do next.** Add rock-abundance and sand-ripple hazards from HiRISE, live orbital dust maps, more landing sites, and a rover-plus-walk mode for longer trips.
 

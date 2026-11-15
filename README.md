@@ -2,7 +2,7 @@
 
 **NASA Space Apps Challenge: "Interplanetary Survival Guide: Martian Map"**
 
-**Live site:** https://marswalk-map.netlify.app
+**Live site:** https://marswalk-map.netlify.app · **Code:** https://github.com/lordfire4455/marswalk-planner
 
 A layered map of Jezero Crater that turns data from six NASA missions into one decision: **can a crew safely walk this route today, and what science can they do on the way?**
 
@@ -34,6 +34,12 @@ then open http://localhost:8000.
 | **Go / no-go checks** | Suit time and reserve, walkback on backup oxygen, suit oxygen, terrain, daylight, temperature, dust-storm season, radio line of sight to base, steep base or stops, one-way pickup. |
 | **EVA numbers** | Distance, walking time, climb, metabolic energy, oxygen used, longest walkback, farthest point from base. |
 | **Elevation profile** | Coloured by slope class, with a radio line-of-sight strip. Hover to find any point on the map. |
+| **No-go zones** | Draw an area the crew must not cross (soft sand, boulders, a cliff edge); every route re-plans around it. |
+| **Field reports** | Log a hazard, science find, resource, landmark or radio note with a confidence label (Measured, Observed, Estimated), author and Mars + Earth time. A hazard can keep routes 50 to 200 m away. Saved in the browser, the share link and the GeoJSON. |
+| **Route comparison** | Safest, fastest and science-rich options side by side, drawn on the map, with one click to switch. |
+| **Crew and oxygen** | Crew size and usable O₂ per suit, checked against the walk with a 25% reserve; a solo EVA is flagged. |
+| **Key takeaway and trust labels** | One plain sentence per plan; every number tagged "NASA terrain", "Model" or "Your input"; a "How sure are we?" panel listing what was checked against NASA. |
+| **Guided tour** | A 14-step, one-minute spotlight tour from the mission overview or the top bar. |
 | **Mission overview** | An entrance screen that explains the project, shows live Jezero time, maps each challenge requirement to a feature, and jumps into any of the four views. |
 | **Crew or machine?** | The same route scored 0–100 for a suited crew on foot and for an autonomous six-wheeled machine, each with a GO / CAUTION / NO-GO verdict, the limiting factor and a one-line recommendation (also in the briefing). |
 | **3D preview** | The route draped over a solid block of real terrain, with a fly-through in which a suited astronaut (drawn larger than life so it stays visible) walks the route, leans into climbs and waves on arrival. An Astronaut / Machine switch swaps in a procedural rocker-bogie rover (turning wheels, scanning mast, arm that unstows on arrival); it starts on whichever option scored higher. |
@@ -59,11 +65,13 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 ## How it works
 
 - `js/terrain.js`: unpacks the elevation model, computes slope (Horn's method) and shaded relief, samples elevation, checks line of sight including the curvature of Mars.
-- `js/router.js`: A* route search with 16 directions of movement. Step cost is walking time multiplied by a slope hazard factor, the same factor at every slope limit.
+- `js/router.js`: A* route search with 16 directions of movement. Step cost is walking time multiplied by a slope hazard factor, the same factor at every slope limit (strong for "Safest", weak for "Fastest"). Cells inside no-go zones are impassable.
 - `js/eva.js`: walking speed as a function of slope from Apollo 14 traverse data (Marquez 2008) and metabolic cost from Santee et al. (2001) at Mars gravity. These are the models used by the NASA / MIT SEXTANT traverse planner.
 - `js/planner.js` also applies the Apollo walkback rule: from every point of the route, the walk to safety (retracing the route or carrying on to its end) plus the 15 min airlock time must fit inside the backup oxygen time.
 - `js/mars-time.js`: Mars Sol Date, local solar time, solar longitude, sunrise and sunset (Allison & McEwen 2000, the algorithm behind NASA's Mars24).
 - `js/conditions.js`, `js/planner.js`, `js/science.js`, `js/layers.js`, `js/briefing.js`, `js/view3d.js`: weather, planning, targets, map layers, briefing, 3D.
+- `js/field.js`: no-go zones and field reports; burns zones into a mask over the elevation grid that the router treats as impassable.
+- `js/tour.js`: the guided tour.
 - `js/explain.js`: the *Why this route?* panel. It re-walks the straight line and runs the router once more with the slope penalty off (`hazardWeight: 0`) to compare against.
 - `js/intro.js`: the mission overview (entrance screen). `js/app.js`: start-up, tabs, ready-made missions and the Data & methods window.
 - `tools/build_data.py`: rebuilds everything in `data/` from the raw NASA files.
@@ -73,6 +81,12 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 - The Mars clock reproduces the sol number and sunrise time in NASA's weather feeds (Perseverance sol 1127 on 2024-04-21, sunrise 06:13; Curiosity sol 4995 on 2026-08-25).
 - The elevation model agrees with Perseverance's own localization at all 708 rover waypoints: mean difference 0.9 m, standard deviation 3.4 m.
 - Sample-site positions are the rover waypoints for the sols on which each sample was collected.
+- **Route choice, against Perseverance.** We cut the rover's real drive into 40 stretches of about 1 km (40.7 km in all) and gave the planner only each stretch's start and end. 79% of the planned route length lies within 100 m of the path JPL's drivers chose (median stretch 100%, median gap 44 m). Only 2.9% of the planned routes is on slopes over 15°, against 6.6% for the rover and 5.8% for straight lines, and none is over the 25° limit. Rebuild it with `node tools/validate_routes.js`; see it with the *Planner vs Perseverance* layer.
+
+## Measured impact and science at each stop
+
+- Every plan shows its own measured impact: the steep ground a straight-line walk would cross, the extra distance the safe route costs, science stops per EVA hour and the oxygen left per suit.
+- At every stop and science target the app reads the MRO CRISM browse products (Viviano-Beck et al. 2014) and reports a relative band strength for carbonate, Fe/Mg clay, hydrated minerals, olivine, pyroxene and chlorite, with what each mineral means for the search for life. The images are baked into a 64 kB grid (`tools/build_minerals.py`), so this also works offline.
 
 ## Limits
 
@@ -88,9 +102,9 @@ Eleven published datasets from six NASA missions. See [docs/DATA_SOURCES.md](doc
 - Everything is plain HTML, CSS and JavaScript. There is no build step and nothing to install. Edit a file, reload the page.
 - `index.html` loads the scripts in order. Each module adds itself to `window.MM` (for example `MM.planner`, `MM.terrain`).
 - `data/*.js` are generated files. Change them by running `python tools/build_data.py <folder with the raw NASA files>`, not by hand.
-- `vendor/` holds Leaflet and three.js, so the app runs offline.
+- `vendor/` holds Leaflet, three.js and the two web fonts, so the app runs offline.
 - Check a change in Chrome and on a phone-sized window (the layout changes below 900 px wide) before you push.
 
 ## Credits
 
-Map library: [Leaflet](https://leafletjs.com) (BSD-2). 3D: [three.js](https://threejs.org) (MIT). Data courtesy NASA/JPL-Caltech, USGS Astrogeology, University of Arizona, JHU-APL, Arizona State University, MSSS, and CAB (CSIC-INTA). NASA does not endorse this project.
+Map library: [Leaflet](https://leafletjs.com) (BSD-2). 3D: [three.js](https://threejs.org) (MIT). Fonts: Space Grotesk and DM Sans (SIL Open Font License), bundled in `vendor/fonts/`. Overview globe: NASA Viking Orbiter colour mosaic (MDIM 2.1) via NASA Solar System Treks. Data courtesy NASA/JPL-Caltech, USGS Astrogeology, University of Arizona, JHU-APL, Arizona State University, MSSS, and CAB (CSIC-INTA). NASA does not endorse this project.

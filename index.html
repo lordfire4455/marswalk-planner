@@ -19,14 +19,22 @@
 </div>
 
 <header id="topbar">
-  <button id="menu-btn" class="icon-btn" aria-label="Toggle panel">☰</button>
+  <button id="menu-btn" class="icon-btn" aria-label="Toggle panel"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 5.5h14M3 10h14M3 14.5h14"/></svg></button>
   <div class="brand" id="brand" title="Mission overview">
-    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="10.5" stroke="currentColor" stroke-width="1.5" opacity=".9"/><path d="M8.2 19.6c2.9-1.5 5.3-1.1 7.8.2s5.1 1.7 7.9-.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".45"/><path d="M3.2 22C8 12.2 21.6 7.4 28.8 10.6" stroke="var(--mars)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="1.6 2.6"/><circle cx="25.2" cy="9.8" r="2" fill="var(--mars)"/></svg></span>
     <div>
-      <div class="brand-name">MARSWALK PLANNER</div>
-      <div class="brand-sub">Interplanetary Survival Guide · Jezero Crater, Mars</div>
+      <div class="brand-name">MARS<span>WALK</span></div>
+      <div class="brand-sub">Plan every step on Mars</div>
     </div>
   </div>
+  <nav class="topnav" id="topnav" aria-label="Pages">
+    <button class="nav-link" id="nav-home">Home</button>
+    <button class="tab active" data-tab="plan" role="tab">Planner</button>
+    <button class="tab" data-tab="layers" role="tab">Layers</button>
+    <button class="tab" data-tab="science" role="tab">Science</button>
+    <button class="tab" data-tab="conditions" role="tab">Conditions</button>
+    <button class="nav-link" id="nav-about">About</button>
+  </nav>
   <div class="telemetry" id="telemetry">
     <div class="tm"><span class="tm-k">Jezero local time</span><span class="tm-v" id="tm-lmst">--:--</span></div>
     <div class="tm"><span class="tm-k">Mission sol</span><span class="tm-v" id="tm-sol">–</span></div>
@@ -35,8 +43,10 @@
     <div class="tm"><span class="tm-k">Dust risk</span><span class="tm-v" id="tm-dust">–</span></div>
   </div>
   <div class="top-actions">
-    <button id="btn-intro" class="ghost-btn" title="Reopen the mission overview" aria-label="Mission overview"><span class="lbl-long">Mission overview</span><span class="lbl-short" aria-hidden="true">i</span></button>
-    <button id="btn-about" class="ghost-btn">Data &amp; methods</button>
+    <button id="btn-intro" class="nav-btn" title="Back to the home page" aria-label="Home"><span class="lbl-long">Home</span><span class="lbl-short" aria-hidden="true"><svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7.2"/><path d="M10 9v4.6M10 6.4v.1" stroke-linecap="round"/></svg></span></button>
+    <button id="btn-about" class="nav-btn">Data &amp; methods</button>
+    <button id="btn-tour" class="pill-btn" title="A one-minute guided tour of the planner" aria-label="Guided tour"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7.2"/><path d="M7.9 8a2.2 2.2 0 1 1 3 2c-.6.3-.9.7-.9 1.3v.4M10 14.1v.1" stroke-linecap="round"/></svg><span class="lbl-long">Tour</span></button>
+    <a class="nav-btn nav-gh" href="https://github.com/lordfire4455/marswalk-planner" target="_blank" rel="noopener">Open source <span aria-hidden="true">↗</span></a>
   </div>
 </header>
 
@@ -82,30 +92,70 @@
             <button data-v="careful">Careful</button><button data-v="nominal" class="on">Nominal</button><button data-v="brisk">Brisk</button>
           </div>
         </div>
+        <div class="field">
+          <label>Route priority</label>
+          <div class="seg" id="opt-mode">
+            <button data-v="safe" class="on" title="Avoid sloping ground as much as possible">Safest</button><button data-v="fast" title="Shortest walking time that still respects the slope limit">Fastest</button>
+          </div>
+        </div>
         <div class="field two">
           <div><label for="opt-start">Leave airlock (local time)</label><input type="time" id="opt-start" value="09:00"></div>
           <div><label for="opt-limit">Suit limit (hours)</label><input type="number" id="opt-limit" value="8" min="2" max="10" step="0.5"></div>
         </div>
         <div class="field two">
+          <div><label for="opt-crew">Crew on this EVA</label><input type="number" id="opt-crew" value="2" min="1" max="6" step="1"></div>
           <div><label for="opt-o2" title="Oxygen the suit can use for breathing. Set it to your suit's value.">Suit oxygen (g)</label><input type="number" id="opt-o2" value="600" min="50" max="5000" step="50"></div>
           <div><label for="opt-walkback" title="Walkback rule: from any point, the crew must be able to walk to safety and get inside on backup oxygen alone.">Backup O₂ (min)</label><input type="number" id="opt-walkback" value="60" min="5" max="240" step="5"></div>
         </div>
         <label class="switch-row"><input type="checkbox" id="opt-round" checked><span>Walk back to base at the end</span></label>
       </div>
 
+      <div class="block" id="field-block">
+        <div class="block-h">Hazards and field reports
+          <span class="block-actions"><button id="btn-field-clear" class="mini-btn" title="Remove all zones and reports" hidden>Clear</button></span>
+        </div>
+        <div class="field-tools">
+          <button id="btn-zone" class="tool-btn"><i aria-hidden="true">⬠</i><span><b>Draw a no-go zone</b><small>Routes re-plan around it</small></span></button>
+          <button id="btn-obs" class="tool-btn"><i aria-hidden="true">✎</i><span><b>Add a field report</b><small>Note what the crew found</small></span></button>
+        </div>
+        <ul id="field-list" class="field-list"></ul>
+        <div id="field-empty" class="hint">Mark ground the crew must not cross, or log a hazard, a find or a landmark with how sure you are. Everything is saved in this browser and in the share link.</div>
+      </div>
+
       <div class="block" id="summary-block" hidden>
         <div class="block-h">Route summary</div>
         <div id="verdict" class="verdict"></div>
+        <p id="takeaway" class="takeaway"></p>
+        <div class="impact" id="impact"></div>
         <div class="stats" id="stats"></div>
+        <div class="trust-legend" id="trust-legend"><span><em class="tt data">NASA terrain</em> from the elevation model</span><span><em class="tt model">Model</em> planning estimate</span><span><em class="tt plan">Your input</em></span></div>
         <div class="classbar" id="classbar"></div>
         <div class="classbar-legend" id="classbar-legend"></div>
         <ul class="checks" id="checks"></ul>
+        <div class="stop-sci" id="stop-sci"></div>
         <div class="row-btns">
           <button id="btn-brief" class="primary-btn">EVA briefing</button>
           <button id="btn-3d" class="primary-btn alt">3D preview</button>
           <button id="btn-share" class="ghost-btn">Copy link</button>
           <button id="btn-export" class="ghost-btn">GeoJSON</button>
         </div>
+        <div class="cmp" id="cmp">
+          <button id="btn-compare" class="ghost-btn cmp-btn"><span aria-hidden="true">⇄</span> Compare safest, fastest and science-rich routes</button>
+          <div id="cmp-out"></div>
+        </div>
+        <details class="howsure" id="howsure">
+          <summary>How sure are we?</summary>
+          <ul>
+            <li><span class="lvl ok">Checked against NASA</span><b>Terrain heights.</b> The CTX elevation model agrees with Perseverance's own localization at all 708 rover waypoints: mean difference 0.9 m, spread 3.4 m.</li>
+            <li><span class="lvl ok">Checked against NASA</span><b>Mars clock.</b> Reproduces the sol numbers and sunrise times in NASA's Perseverance and Curiosity weather feeds.</li>
+            <li><span class="lvl ok">Checked against NASA</span><b>Route choice.</b> On 40 stretches of Perseverance's real drive (40.7 km), 79% of the planner's route lies within 100 m of the path JPL's rover drivers chose. Turn on "Planner vs Perseverance" in Layers to see it.</li>
+            <li><span class="lvl ok">Checked against NASA</span><b>Science targets.</b> Each sample site is the rover's surveyed position on the sol the sample was taken.</li>
+            <li><span class="lvl model">Model</span><b>Time, energy and oxygen.</b> Apollo-derived walking and metabolic models (Marquez 2008; Santee et al. 2001), as in NASA / MIT SEXTANT. Planning estimates, never measured on Mars.</li>
+            <li><span class="lvl model">Model</span><b>Weather.</b> A seasonal outlook from 4,745 sols of Curiosity data and Perseverance reports, not a forecast.</li>
+            <li><span class="lvl model">Relative</span><b>Minerals at stops.</b> CRISM band strengths (weak / moderate / strong) from the 2007 orbital scenes, about 18 m per pixel. They show where a mineral is likely, not how much of it there is.</li>
+            <li><span class="lvl no">Not visible</span><b>Rocks and ripples under 20 m.</b> The grid cannot see them. Check the last metres in the HiRISE layer and log what the crew finds as field reports.</li>
+          </ul>
+        </details>
       </div>
 
       <div class="block" id="alloc-block" hidden>
@@ -208,6 +258,12 @@
       <canvas id="profile-cv"></canvas>
     </div>
     <button id="profile-open" class="ghost-btn profile-open" hidden>Show elevation profile</button>
+    <div id="draw-bar" class="draw-bar" hidden>
+      <span id="draw-msg"></span>
+      <button id="draw-undo" class="mini-btn">Undo corner</button>
+      <button id="draw-finish" class="mini-btn hot">Finish</button>
+      <button id="draw-cancel" class="mini-btn">Cancel</button>
+    </div>
     <div id="busy" class="busy" hidden><span class="spin"></span>Finding the safest route…</div>
   </section>
 </main>
@@ -220,22 +276,37 @@
   <div class="intro-grid" aria-hidden="true"></div>
   <div class="intro-art over" aria-hidden="true"><div class="intro-art-in"><svg id="intro-svg" preserveAspectRatio="none"></svg></div></div>
 
+  <div class="intro-globe" id="intro-globe" aria-hidden="true"><canvas></canvas><span class="globe-tag"><i></i>Jezero Crater<small>18.44° N · 77.45° E</small></span><span class="globe-cap">Mars in true colour · NASA Viking Orbiter mosaic (MDIM 2.1) · drag to turn</span></div>
   <div class="intro-more" id="intro-more" hidden><button id="intro-more-btn">Choose where to start <span aria-hidden="true">↓</span></button></div>
   <div class="intro-scroll" id="intro-scroll">
     <div class="intro-wrap">
-      <header class="intro-top">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span class="intro-event">NASA Space Apps Challenge <i>·</i> Interplanetary Survival Guide: Martian Map</span>
-        <button class="intro-skip" data-go="plan" data-plain="1">Skip to planner →</button>
+      <header class="intro-top" id="intro-top">
+        <div class="snav-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="10.5" stroke="currentColor" stroke-width="1.5" opacity=".9"/><path d="M8.2 19.6c2.9-1.5 5.3-1.1 7.8.2s5.1 1.7 7.9-.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".45"/><path d="M3.2 22C8 12.2 21.6 7.4 28.8 10.6" stroke="var(--mars)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="1.6 2.6"/><circle cx="25.2" cy="9.8" r="2" fill="var(--mars)"/></svg></span><span class="snav-txt"><b>MARS<span>WALK</span></b><small>Plan every step on Mars</small></span></div>
+        <nav class="snav-links" id="snav" aria-label="Pages">
+          <button class="snav-a on" data-scroll="top">Home</button>
+          <button class="snav-a intro-skip" data-go="plan" data-plain="1">Planner</button>
+          <button class="snav-a" data-go="layers">Layers</button>
+          <button class="snav-a" data-go="science">Science</button>
+          <button class="snav-a" data-go="conditions">Conditions</button>
+          <button class="snav-a" data-scroll="intro-proof">Proof</button>
+          <button class="snav-a" data-scroll="intro-brief">The challenge</button>
+          <button class="snav-a" data-scroll="intro-datasec">NASA data</button>
+          <button class="snav-a" data-about="1">About</button>
+        </nav>
+        <div class="snav-right">
+          <button class="pill-btn" id="intro-tour-top" title="A one-minute guided tour"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7.2"/><path d="M7.9 8a2.2 2.2 0 1 1 3 2c-.6.3-.9.7-.9 1.3v.4M10 14.1v.1" stroke-linecap="round"/></svg>Tour</button>
+          <a class="intro-gh" href="https://github.com/lordfire4455/marswalk-planner" target="_blank" rel="noopener">Open source <span aria-hidden="true">↗</span></a>
+        </div>
       </header>
 
       <section class="intro-hero">
         <div class="intro-hero-main">
-          <div class="intro-kicker"><span class="live-dot"></span>Mission briefing <i>·</i> Jezero Crater, Mars <i>·</i> 18.44° N 77.45° E</div>
+          <div class="intro-kicker"><span class="live-dot"></span>NASA Space Apps Challenge <i>·</i> Jezero Crater, Mars <i>·</i> 18.44° N 77.45° E</div>
           <h1 id="intro-title"><span class="t1">Marswalk Planner</span><span class="t2">Jezero Crater EVA Navigation</span></h1>
           <p class="intro-lead">One mission-ready map that fuses data from six NASA missions to keep astronauts safe on foot while getting the most science out of every hour on Mars.</p>
           <div class="intro-cta">
             <button class="intro-launch" id="intro-launch" data-go="plan" data-plain="1">Launch Mission Planner <span aria-hidden="true">→</span></button>
+            <button class="intro-demo" id="intro-tour"><span aria-hidden="true">?</span> Take the 1-minute tour</button>
             <button class="intro-demo" id="intro-demo"><span aria-hidden="true">▶</span> Watch a demo mission</button>
           </div>
           <div class="intro-stats" id="intro-stats"></div>
@@ -288,7 +359,55 @@
         </div>
       </section>
 
-      <section class="intro-sec">
+      <section class="intro-sec intro-proof" id="intro-proof">
+        <div class="intro-sec-h"><span>Proof, not just pictures</span><small>Measured results you can re-check inside the app</small></div>
+        <div class="pf-hero">
+          <div class="pf-main">
+            <span class="pf-k">Route planning, tested against the real rover</span>
+            <div class="pf-big"><b id="pf-within">79%</b><span>of the planner's route length runs within 100 m of the path NASA's Perseverance drivers actually chose</span></div>
+            <p class="pf-note" id="pf-method"></p>
+            <button class="ifit-go" id="pf-show">See both paths on the map →</button>
+          </div>
+          <div class="pf-side">
+            <div class="pf-chart" id="pf-chart" role="img" aria-label="Agreement with the rover's path for each tested stretch"></div>
+            <div class="pf-stats" id="pf-stats"></div>
+          </div>
+        </div>
+        <div class="pf-grid">
+          <div class="pf-card">
+            <span class="pf-k">Real NASA data in every decision</span>
+            <ul class="pf-list">
+              <li><b>CTX elevation, 20 m</b>slope, safe routes, climb, radio line of sight</li>
+              <li><b>CRISM spectra</b>minerals at every stop and science target</li>
+              <li><b>HiRISE 25 cm</b>last-metre check of rocks and ripples</li>
+              <li><b>THEMIS night IR</b>firm rock versus soft sand underfoot</li>
+              <li><b>MEDA &amp; REMS weather</b>cold, daylight and dust-storm risk</li>
+              <li><b>Perseverance traverse</b>the validation above</li>
+            </ul>
+          </div>
+          <div class="pf-card">
+            <span class="pf-k">Science at the destination</span>
+            <p class="pf-p">At every stop the planner reads the orbital mineral maps and says what is there and why it matters.</p>
+            <ul class="pf-sites" id="pf-sites"><li class="pf-wait">Reading the CRISM mineral maps…</li></ul>
+          </div>
+          <div class="pf-card">
+            <span class="pf-k">What the crew gains, measured</span>
+            <ul class="pf-gain" id="pf-gain"></ul>
+          </div>
+          <div class="pf-card">
+            <span class="pf-k">Real-world uses beyond this map</span>
+            <p class="pf-p">The engine needs only an elevation model, so the same safety logic carries over to:</p>
+            <ul class="pf-list pf-uses">
+              <li><b>Artemis Moon walks</b>slope, suit time, oxygen and sunlight at the lunar south pole</li>
+              <li><b>Rover drive planning</b>first-pass routes, already shown to match Perseverance's</li>
+              <li><b>Field geology and analog missions on Earth</b>safe traverses to sampling sites</li>
+              <li><b>Search and rescue in mountains</b>fastest legal route under a slope limit</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="intro-sec" id="intro-brief">
         <div class="intro-sec-h"><span>Built to the challenge brief</span><small>What the app does for each requirement, and where to see it</small></div>
         <div class="intro-fit">
           <div class="ifit">
@@ -314,7 +433,7 @@
         </div>
       </section>
 
-      <section class="intro-sec intro-data">
+      <section class="intro-sec intro-data" id="intro-datasec">
         <div class="intro-sec-h"><span>NASA data inside</span><small>Every layer is a published mission product. Nothing is simulated.</small></div>
         <div class="intro-badges">
           <span><b>MRO</b> HiRISE imagery</span>
@@ -357,18 +476,24 @@
 <script src="data/targets.js"></script>
 <script src="data/weather.js"></script>
 <script src="data/crism.js"></script>
+<script src="data/validation.js"></script>
+<script src="data/minerals.js"></script>
 <script src="js/mars-time.js"></script>
 <script src="js/terrain.js"></script>
 <script src="js/eva.js"></script>
 <script src="js/router.js"></script>
 <script src="js/layers.js"></script>
+<script src="js/sitedata.js"></script>
 <script src="js/science.js"></script>
 <script src="js/conditions.js"></script>
+<script src="js/field.js"></script>
 <script src="js/planner.js"></script>
 <script src="js/explain.js"></script>
 <script src="js/briefing.js"></script>
 <script src="js/view3d.js"></script>
+<script src="js/globe.js"></script>
 <script src="js/intro.js"></script>
+<script src="js/tour.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

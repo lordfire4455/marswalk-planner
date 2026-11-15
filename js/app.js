@@ -82,8 +82,21 @@
           <li><b>Radio cover.</b> Line of sight from each step to a 10 m mast at base over the elevation model, including the curvature of Mars.</li>
           <li><b>Mars time and Sun.</b> Allison &amp; McEwen (2000), the algorithm behind NASA's Mars24. It reproduces the sol numbers and sunrise times in the mission weather feeds.</li>
           <li><b>Dust risk.</b> Seasonal storm windows by solar longitude (Kass et al. 2016).</li>
+          <li><b>Crew.</b> A crew of one is flagged: EVAs are walked in pairs, so someone can help if a suit or an ankle fails.</li>
+          <li><b>No-go zones and field reports.</b> Areas the crew draws are burned into a mask over the 20 m grid, and the route search treats those cells as impassable. A hazard report can keep routes 50 to 200 m away. Each report carries a confidence label: Measured, Observed or Estimated.</li>
+          <li><b>Route options.</b> "Safest" weights slope strongly (hazard factor 1 + 2.5 (s / 20°)²); "Fastest" nearly ignores slope below the limit; "Science-rich" adds up to three targets near the route while the suit reserve still holds.</li>
           <li><b>Weather at Jezero.</b> Perseverance MEDA readings when they come from the same part of the Mars year. Otherwise Curiosity's Gale Crater norms stand in. Gale is at 4.6° S and much lower than Jezero, so its pressure is scaled to Jezero by the ratio of MEDA's readings to the Gale median for the same season (an estimate, good to a few percent).</li>
         </ul>
+        ${window.MM_VALIDATION ? (() => { const V = window.MM_VALIDATION.summary; return `<h3>Validation against Perseverance</h3>
+        <p>${window.MM_VALIDATION.method}</p>
+        <ul>
+          <li><b>Agreement.</b> ${Math.round(V.within100_overall * 100)}% of the planned routes lie within 100 m of the rover's track (median stretch ${Math.round(V.within100_median * 100)}%, median gap ${V.mean_offset_median_m} m) over ${V.stretches} stretches and ${V.rover_km} km of driving.</li>
+          <li><b>Steep ground.</b> ${(V.plan_steep15 * 100).toFixed(1)}% of the planned routes is on slopes over 15°, against ${(V.rover_steep15 * 100).toFixed(1)}% for the rover and ${(V.straight_over15_m / V.straight_km / 10).toFixed(1)}% for straight lines between the same points.</li>
+          <li><b>Length.</b> The planner's routes are ${Math.round((1 - V.length_ratio) * 100)}% shorter than the rover's drive, which also detoured to science targets and turned on the spot.</li>
+          <li><b>Reproduce it.</b> <code>node tools/validate_routes.js</code> rebuilds <code>data/validation.js</code> from the bundled data.</li>
+        </ul>`; })() : ''}
+        <h3>Minerals at a point</h3>
+        <p>Each CRISM browse image stores three spectral band indices as its red, green and blue channels (Viviano-Beck et al. 2014): MAF for olivine and pyroxene, CAR for clay, carbonate and hydration, PFM for chlorite and Fe/Mg clays. We average the pixels in each 100 m cell (tools/build_minerals.py) and the planner reports a relative strength at each stop: weak, moderate or strong. It shows where a mineral is likely, not how much is there.</p>
         <h3>Limits you should know</h3>
         <ul>
           <li>A 20 m grid cannot see individual rocks or sand ripples. Use the HiRISE layer to check the last metres by eye.</li>
@@ -91,7 +104,7 @@
           <li>The walkback time follows the planned route, so a real shortcut back could be quicker. It is an upper bound on the walking time, not an exact time, and a slower walk back (an injured crew member) would take longer.</li>
           <li>Speed and energy models come from Apollo lunar data and are planning estimates.</li>
         </ul>
-        <p class="note">Built for the NASA Space Apps Challenge. NASA does not endorse this project. Map library: Leaflet (BSD-2).</p>
+        <p class="note">Built for the NASA Space Apps Challenge. NASA does not endorse this project. Map library: Leaflet (BSD-2). 3D: three.js (MIT). Source code: <a href="https://github.com/lordfire4455/marswalk-planner" target="_blank" rel="noopener">github.com/lordfire4455/marswalk-planner</a>.</p>
       </div>`, 'wide');
   }
 
@@ -104,13 +117,19 @@
       MM.layers.init();
       MM.science.init();
       MM.conditions.init();
+      MM.field.init();
       MM.planner.init();
+      if (MM.site) MM.site.load().then((ok) => { if (ok) { MM.science.refresh(); MM.planner.refresh(); } });
       if (MM.explain) MM.explain.init();
 
-      $('presets').innerHTML = PRESETS.map((p) => `<button class="preset" data-preset="${p.id}"><span class="preset-ico">${p.icon}</span><span><b>${p.title}</b><small>${p.sub}</small></span></button>`).join('');
+      $('presets').innerHTML = PRESETS.map((p, i) => `<button class="preset" data-preset="${p.id}"><span class="preset-ico">${String(i + 1).padStart(2, '0')}</span><span><b>${p.title}</b><small>${p.sub}</small></span></button>`).join('');
       $('presets').addEventListener('click', (e) => { const b = e.target.closest('[data-preset]'); if (b) runPreset(b.dataset.preset); });
-      document.querySelector('.tabs').addEventListener('click', (e) => { const t = e.target.closest('.tab'); if (t) showTab(t.dataset.tab); });
+      const onTab = (e) => { const t = e.target.closest('.tab'); if (t) showTab(t.dataset.tab); };
+      document.querySelector('.tabs').addEventListener('click', onTab);
+      $('topnav').addEventListener('click', onTab);
       $('btn-about').addEventListener('click', about);
+      $('nav-about').addEventListener('click', about);
+      $('nav-home').addEventListener('click', () => MM.intro.open());
       $('modal-x').addEventListener('click', closeModal);
       $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });
       document.addEventListener('keydown', (e) => {
@@ -118,6 +137,7 @@
         if (!$('modal').hidden) closeModal(); else MM.intro.close();
       });
       $('btn-intro').addEventListener('click', () => MM.intro.open());
+      $('btn-tour').addEventListener('click', () => MM.tour.start());
       $('brand').addEventListener('click', () => MM.intro.open());
       $('menu-btn').addEventListener('click', () => { document.body.classList.toggle('panel-open'); setTimeout(() => MM.map.invalidateSize(), 260); });
       if (window.innerWidth > 900) document.body.classList.add('panel-open');

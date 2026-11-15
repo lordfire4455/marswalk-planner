@@ -211,17 +211,83 @@
     safe(() => drawLayers(relief, hazard, elevation));
     safe(() => drawScience(relief));
 
-    const box = $('intro');
+    const box = $('intro'), sc = $('intro-scroll');
     box.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go, !!b.dataset.plain, b.dataset.focus);
+      const b = e.target.closest('[data-go]'); if (b) { go(b.dataset.go, !!b.dataset.plain, b.dataset.focus); return; }
+      const sTo = e.target.closest('[data-scroll]');
+      if (sTo) { const id = sTo.dataset.scroll; if (id === 'top') sc.scrollTo({ top: 0, behavior: 'smooth' }); else $(id).scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      if (e.target.closest('[data-about]')) MM.app.about();
     });
+    $('intro-tour-top').addEventListener('click', () => { close(); MM.tour.start(); });
+    safe(buildProof);
+    $('pf-show').addEventListener('click', showValidation);
     $('intro-demo').addEventListener('click', () => { close(); MM.app.runPreset('depot'); });
+    $('intro-tour').addEventListener('click', () => { close(); MM.tour.start(); });
     $('intro-about').addEventListener('click', () => MM.app.about());
     window.addEventListener('resize', () => { if (!box.hidden) { layoutArt(); cue(); } });
     // The traverse drawing belongs to the hero: it fades away as the page scrolls to the cards.
-    const over = box.querySelector('.intro-art.over'), sc = $('intro-scroll');
-    sc.addEventListener('scroll', () => { over.style.setProperty('--fade', Math.max(0, 1 - sc.scrollTop / 260).toFixed(2)); cue(); }, { passive: true });
+    const over = box.querySelector('.intro-art.over');
+    const globe = $('intro-globe');
+    sc.addEventListener('scroll', () => {
+      over.style.setProperty('--fade', Math.max(0, 1 - sc.scrollTop / 260).toFixed(2));
+      globe.style.setProperty('--fade', Math.max(0.12, 1 - sc.scrollTop / 520).toFixed(2));
+      cue(); spy();
+    }, { passive: true });
+    // The globe sits behind the scrolling page so it can be dragged; pass mouse-wheel scrolling over it on to the page.
+    box.addEventListener('wheel', (e) => { if (!sc.contains(e.target)) sc.scrollTop += e.deltaY; }, { passive: true });
     $('intro-more-btn').addEventListener('click', () => box.querySelector('.intro-cards').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }
+
+  // ------------------------------------------------------------------ proof section
+  /** Fill the "Proof" section from data/validation.js and, once read, the CRISM minerals. */
+  function buildProof() {
+    const V = window.MM_VALIDATION;
+    if (V) {
+      const S = V.summary, pct = (v) => Math.round(v * 100) + '%';
+      $('pf-within').textContent = pct(S.within100_overall);
+      $('pf-method').textContent = `We cut Perseverance's real drive into ${S.stretches} stretches of about 1 km (${S.rover_km} km in all), gave the planner only each stretch's start and end, and compared its route with the rover's track on the same CTX elevation model.`;
+      const ok = V.stretches.filter((x) => x.ok);
+      $('pf-chart').innerHTML = '<div class="pf-bars">' + ok.map((x) => `<i style="height:${Math.max(4, x.within100 * 100)}%" title="${(x.rover_m / 1000).toFixed(2)} km stretch: ${pct(x.within100)} within 100 m, mean gap ${x.mean_offset_m} m"></i>`).join('') +
+        '</div><div class="pf-axis"><span>each bar: one stretch of the drive</span><span>% of route within 100 m</span></div>';
+      const st = [
+        [S.mean_offset_median_m + ' m', 'median gap between the two paths'],
+        [(S.plan_steep15 * 100).toFixed(1) + '% vs ' + (S.rover_steep15 * 100).toFixed(1) + '%', 'of the path on slopes over 15°, planner vs rover'],
+        [S.plan_over25_m + ' m', 'of planned route over the 25° limit'],
+      ];
+      $('pf-stats').innerHTML = st.map((r) => `<div><b>${r[0]}</b><span>${r[1]}</span></div>`).join('');
+      const steepPlanM = Math.round(S.plan_steep15 * S.plan_km * 1000), straightPct = S.straight_over15_m / (S.straight_km * 1000);
+      $('pf-gain').innerHTML = [
+        [`${(S.straight_over15_m / 1000).toFixed(1)} km`, `of slopes over 15° on straight lines between the same points. The planner's routes cross ${(steepPlanM / 1000).toFixed(1)} km, ${Math.round(steepPlanM / (S.plan_km * 1000) * 100)}% of the distance instead of ${Math.round(straightPct * 100)}%.`],
+        ['0 m', 'over the crew\'s slope limit on any planned route. Steeper cells are impassable to the search.'],
+        ['Every plan', 'shows its own measured impact: steep ground avoided, the detour it costs, science per EVA hour and oxygen left.'],
+        ['GO / NO-GO', 'from 10 checks a crew lead can read in five seconds, with the source of every number.'],
+      ].map((r) => `<li><b>${r[0]}</b><span>${r[1]}</span></li>`).join('');
+    }
+    if (MM.site) { MM.site.load(); MM.site.onReady(proofSites); if (MM.site.state() === 'unavailable') $('pf-sites').innerHTML = '<li class="pf-wait">Mineral data cannot be read in this browser.</li>'; }
+  }
+  /** Three science targets with the strongest, different mineral signals. */
+  function proofSites() {
+    const seen = new Set(), rows = [];
+    const scored = MM.science.all().map((t) => ({ t, m: MM.site.minerals(t.lat, t.lon) })).filter((x) => x.m && x.m.length && x.m[0].level >= 2).sort((a, b) => b.m[0].value - a.m[0].value);
+    for (const x of scored) { if (seen.has(x.m[0].key)) continue; seen.add(x.m[0].key); rows.push(x); if (rows.length === 3) break; }
+    $('pf-sites').innerHTML = rows.map((x) => `<li><b>${x.t.name}</b><div class="min-row">${MM.site.chips(x.m, 2)}</div><p>${x.m[0].why}</p></li>`).join('') || '<li class="pf-wait">No strong mineral signals at the targets.</li>';
+  }
+  function showValidation() {
+    go('layers', true);
+    setTimeout(() => {
+      MM.layers.toggle('validation', true);
+      const pts = []; (window.MM_VALIDATION ? window.MM_VALIDATION.stretches : []).forEach((x) => { if (x.ok) pts.push(...x.line); });
+      if (pts.length) MM.map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
+    }, 350);
+  }
+
+  /** Header: a glass bar once the page scrolls, and the link for the section in view lit up. */
+  function spy() {
+    const sc = $('intro-scroll'), top = $('intro-top');
+    top.classList.toggle('stuck', sc.scrollTop > 8);
+    let cur = 'top';
+    ['intro-proof', 'intro-brief', 'intro-datasec'].forEach((id) => { const el = $(id); if (el && el.getBoundingClientRect().top < window.innerHeight * 0.45) cur = id; });
+    $('snav').querySelectorAll('[data-scroll]').forEach((a) => a.classList.toggle('on', a.dataset.scroll === cur));
   }
 
   /** On short screens the cards start below the fold: show a pointer to them until the page is scrolled. */
@@ -241,16 +307,19 @@
     document.body.classList.add('intro-open');
     $('intro-scroll').scrollTop = 0;
     box.querySelector('.intro-art.over').style.removeProperty('--fade');
-    layoutArt(); tick(); cue();
+    $('intro-globe').style.removeProperty('--fade');
+    layoutArt(); tick(); cue(); spy();
     try { drawConditions(); } catch (err) { console.warn('Overview picture skipped:', err); }
     clearInterval(timer); timer = setInterval(tick, 1000);
-    $('intro-launch').focus({ preventScroll: true });
+    if (MM.globe) MM.globe.mount($('intro-globe'));
+    box.setAttribute('tabindex', '-1'); box.focus({ preventScroll: true });   // keyboard users start inside the dialog, without a ring on the button
   }
 
   function close() {
     const box = $('intro');
     if (box.hidden || box.classList.contains('leaving')) return;
     clearInterval(timer);
+    if (MM.globe) setTimeout(() => MM.globe.pause(), 420);
     box.classList.add('leaving');
     document.body.classList.remove('intro-open');
     setTimeout(() => { box.hidden = true; box.classList.remove('leaving'); }, 420);

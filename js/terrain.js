@@ -9,12 +9,12 @@
 
   // Slope classes used everywhere (map legend, route colouring, statistics).
   const CLASSES = [
-    { max: 5, label: 'Easy', range: '0–5°', color: '#2fbf71', rgb: [47, 191, 113] },
-    { max: 10, label: 'Moderate', range: '5–10°', color: '#b4d455', rgb: [180, 212, 85] },
-    { max: 15, label: 'Caution', range: '10–15°', color: '#ffd23f', rgb: [255, 210, 63] },
-    { max: 20, label: 'Difficult', range: '15–20°', color: '#ff8c42', rgb: [255, 140, 66] },
-    { max: 25, label: 'Severe', range: '20–25°', color: '#ef476f', rgb: [239, 71, 111] },
-    { max: 91, label: 'No-go', range: '> 25°', color: '#8b1e3f', rgb: [139, 30, 63] },
+    { max: 5, label: 'Easy', range: '0–5°', color: '#34b27d', rgb: [52, 178, 125] },
+    { max: 10, label: 'Moderate', range: '5–10°', color: '#a7c75f', rgb: [167, 199, 95] },
+    { max: 15, label: 'Caution', range: '10–15°', color: '#e9c24f', rgb: [233, 194, 79] },
+    { max: 20, label: 'Difficult', range: '15–20°', color: '#e8874a', rgb: [232, 135, 74] },
+    { max: 25, label: 'Severe', range: '20–25°', color: '#d94f6a', rgb: [217, 79, 106] },
+    { max: 91, label: 'No-go', range: '> 25°', color: '#7c1d3c', rgb: [124, 29, 60] },
   ];
   function classOf(slopeDeg) {
     for (let i = 0; i < CLASSES.length; i++) if (slopeDeg < CLASSES[i].max) return i;

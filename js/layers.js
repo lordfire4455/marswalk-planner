@@ -63,6 +63,8 @@
       note: 'Ground tracks of all 72 flights of the first aircraft on another planet.' },
     { id: 'targets', group: 'Missions', name: 'Science targets', tag: 'Mars 2020 sample sites', on: true, opacity: 1,
       note: 'Sample sites, the Three Forks depot and landmarks. Click one for details.' },
+    { id: 'validation', group: 'Proof', name: 'Planner vs Perseverance', tag: 'Validation · 40 stretches', on: false, opacity: 1,
+      note: 'Cyan: the route this planner picks between the same start and end as each 1 km of Perseverance\'s real drive (white). The two agree within 100 m for most of the way.' },
   ];
 
   // ------------------------------------------------------------------ helpers
@@ -97,6 +99,19 @@
     return grp;
   }
 
+  /** The planner's routes for each validated stretch of Perseverance's drive (data/validation.js). */
+  function validationLayer() {
+    const grp = L.layerGroup(), V = window.MM_VALIDATION;
+    if (!V) return grp;
+    for (const s of V.stretches) {
+      if (!s.ok) continue;
+      grp.addLayer(L.polyline(s.line, { pane: 'tracks', color: '#5fd3ef', weight: 3, opacity: 0.95, interactive: true })
+        .bindTooltip(`Planner ${(s.plan_m / 1000).toFixed(2)} km · rover ${(s.rover_m / 1000).toFixed(2)} km · ${Math.round(s.within100 * 100)}% within 100 m`, { sticky: true }));
+      grp.addLayer(L.circleMarker(s.from, { pane: 'tracks', radius: 3, color: '#5fd3ef', weight: 1, fillOpacity: 1, interactive: false }));
+    }
+    return grp;
+  }
+
   function roverLayer() {
     const R = window.MM_ROVER;
     const grp = L.layerGroup();
@@ -113,7 +128,7 @@
       }
     }
     const last = R.waypoints[R.waypoints.length - 1];
-    grp.addLayer(L.marker([last[2], last[1]], { pane: 'tracks', icon: L.divIcon({ className: '', html: '<div class="rover-pin" title="Perseverance">🤖</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) })
+    grp.addLayer(L.marker([last[2], last[1]], { pane: 'tracks', icon: L.divIcon({ className: '', html: '<div class="rover-pin" title="Perseverance rover, latest position"><i></i><span>Perseverance</span></div>', iconSize: [14, 14], iconAnchor: [7, 7] }) })
       .bindTooltip('Perseverance position on sol ' + last[0] + ' (latest bundled data): ' + R.total_km + ' km driven', { direction: 'top' }));
     return grp;
   }
@@ -169,7 +184,7 @@
       elevation: canvasOverlay(() => T.renderElevation(), 'raster', 0.75),
       themis: tile('THEMIS_NightIR_ControlledMosaics_100m_v2_oct2018', 'png', { maxNativeZoom: 9, pane: 'raster', opacity: 0.7 }),
       crism_maf: crismLayer('maf', 0.8), crism_car: crismLayer('car', 0.8), crism_pfm: crismLayer('pfm', 0.8),
-      rover: roverLayer(), heli: heliLayer(), targets: L.layerGroup(),
+      rover: roverLayer(), heli: heliLayer(), targets: L.layerGroup(), validation: validationLayer(),
     };
 
     // DEM footprint: shows where routing and terrain layers are available.
@@ -207,6 +222,7 @@
         s += '   ·   ' + Math.round(z) + ' m   ·   slope ' + sl.toFixed(1) + '° <i class="dot" style="background:' + c.color + '"></i>' + c.label;
       }
     } else s += '   ·   outside the elevation model';
+    if (MM.site && MM.site.state() === 'ready') { const m = MM.site.minerals(lat, lng); if (m && m.length) s += '   ·   CRISM: ' + MM.site.short(m, 2).toLowerCase(); }
     el.innerHTML = s;
   }
 
@@ -223,6 +239,7 @@
     // Mineral maps are read one at a time: stacking them mixes the colours.
     if (on && id.indexOf('crism_') === 0) for (const k in L_.over) if (k !== id && k.indexOf('crism_') === 0 && state.overlays[k]) toggle(k, false);
     if (on) layer.addTo(map); else map.removeLayer(layer);
+    if (on && id === 'validation' && !state.overlays.rover) toggle('rover', true);   // the comparison needs the rover's own track
     state.overlays[id] = on;
     if (on && layer.setOpacity) layer.setOpacity(state.opacity[id]);
     const row = document.querySelector('#overlay-list .layer[data-id="' + id + '"]');
